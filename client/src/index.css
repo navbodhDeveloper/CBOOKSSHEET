@@ -1,0 +1,108 @@
+* { box-sizing: border-box; }
+body {
+  font-family: Calibri, Arial, sans-serif;
+  margin: 0;
+  background: #f3f3f3;
+  color: #1a1a1a;
+  font-size: 13px;
+}
+#root { min-height: 100vh; }
+
+.topbar {
+  background: #1f4e78;
+  color: white;
+  padding: 10px 16px;
+}
+.topbar h1 { font-size: 16px; margin: 0; }
+
+.controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #dce6f1;
+  border-bottom: 1px solid #b7c6d9;
+  flex-wrap: wrap;
+}
+.field { display: flex; flex-direction: column; gap: 2px; }
+.field label { font-size: 11px; font-weight: bold; color: #333; }
+.field input, .field select {
+  padding: 5px 6px;
+  border: 1px solid #8ea9c1;
+  min-width: 220px;
+  font-size: 13px;
+}
+button {
+  padding: 6px 12px;
+  border: 1px solid #1f4e78;
+  background: #2e75b6;
+  color: white;
+  cursor: pointer;
+  font-size: 12px;
+}
+button.secondary { background: white; color: #1f4e78; }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+.status { font-size: 12px; color: #444; margin-left: 8px; }
+.status.error { color: #b00020; font-weight: bold; }
+
+#sheetWrap { padding: 12px 16px; }
+.table-scroll { overflow-x: auto; border: 1px solid #999; }
+
+table.grid {
+  border-collapse: collapse;
+  width: 100%;
+  background: white;
+}
+table.grid th, table.grid td {
+  border: 1px solid #b0b0b0;
+  padding: 3px 4px;
+  text-align: center;
+  white-space: nowrap;
+}
+table.grid thead th {
+  background: #d9e1f2;
+  font-weight: bold;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  font-size: 11px;
+}
+table.grid thead tr.group-row th { background: #b4c7e7; }
+table.grid tbody tr:nth-child(even) { background: #f7f9fc; }
+table.grid tbody td input {
+  width: 100%;
+  border: none;
+  text-align: center;
+  padding: 3px 2px;
+  font-size: 12px;
+  background: transparent;
+}
+table.grid tbody td input:focus {
+  outline: 2px solid #2e75b6;
+  background: #fff8dc;
+}
+table.grid tbody td.text-left input { text-align: left; }
+table.grid tfoot td {
+  background: #ffe699;
+  font-weight: bold;
+}
+.section-divider { border-left: 3px solid #1f4e78 !important; }
+.row-actions { margin-top: 8px; }
+
+dialog { border: 1px solid #999; border-radius: 4px; padding: 16px 20px; width: 320px; }
+dialog h2 { margin-top: 0; font-size: 15px; }
+dialog label { display: block; margin-bottom: 10px; font-size: 12px; font-weight: bold; }
+dialog input { width: 100%; padding: 5px; margin-top: 4px; border: 1px solid #999; font-size: 13px; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+td.delete-col { padding: 0; }
+.delete-row-btn {
+  background: transparent;
+  border: none;
+  color: #b00020;
+  font-weight: bold;
+  font-size: 13px;
+  padding: 4px 8px;
+  cursor: pointer;
+  width: 100%;
+}
+.delete-row-btn:hover { background: #fbe4e4; }
