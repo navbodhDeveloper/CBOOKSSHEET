@@ -2,10 +2,14 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const { init } = require('./db');
+const schoolRoutes = require('./routes/schools');
+const exportSchoolsRoutes = require('./routes/export-schools');
 
 const metaRoutes = require('./routes/meta');
 const challanRoutes = require('./routes/challans');
 const exportRoutes = require('./routes/export');
+const orderDetailRoutes = require('./routes/order-details');
+const exportOrderDetailRoutes = require('./routes/export-order-details');
 
 async function start() {
   await init(); // load/seed the JSON database
@@ -14,6 +18,11 @@ async function start() {
   app.use(cors());
   app.use(express.json());
 
+
+  app.use('/api/order-details', orderDetailRoutes);
+  app.use('/api/export', exportOrderDetailRoutes);
+  app.use('/api/schools', schoolRoutes);
+  app.use('/api/export', exportSchoolsRoutes);
   app.use('/api', metaRoutes);
   app.use('/api/challans', challanRoutes);
   app.use('/api/export', exportRoutes);

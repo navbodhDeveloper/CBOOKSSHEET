@@ -13,7 +13,47 @@ body {
   color: white;
   padding: 10px 16px;
 }
-.topbar h1 { font-size: 16px; margin: 0; }
+.topbar h1 { font-size: 16px; margin: 0 0 8px 0; }
+.module-nav { display: flex; gap: 6px; }
+.module-nav-btn {
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.3);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 3px;
+}
+.module-nav-btn.active { background: white; color: #1f4e78; font-weight: bold; }
+
+.module-title {
+  background: #eef3fa;
+  padding: 8px 16px;
+  font-weight: bold;
+  font-size: 14px;
+  border-bottom: 1px solid #b7c6d9;
+}
+
+.global-status {
+  position: fixed;
+  bottom: 12px;
+  right: 16px;
+  background: #333;
+  color: white;
+  padding: 6px 14px;
+  border-radius: 4px;
+  font-size: 12px;
+  opacity: 0.95;
+}
+.global-status:empty { display: none; }
+.global-status.error { background: #b00020; }
+
+.tabs { display: flex; gap: 4px; }
+.tab-btn {
+  background: white;
+  color: #1f4e78;
+  border: 1px solid #8ea9c1;
+  padding: 6px 10px;
+}
+.tab-btn.active { background: #2e75b6; color: white; }
 
 .controls {
   display: flex;
@@ -89,11 +129,6 @@ table.grid tfoot td {
 .section-divider { border-left: 3px solid #1f4e78 !important; }
 .row-actions { margin-top: 8px; }
 
-dialog { border: 1px solid #999; border-radius: 4px; padding: 16px 20px; width: 320px; }
-dialog h2 { margin-top: 0; font-size: 15px; }
-dialog label { display: block; margin-bottom: 10px; font-size: 12px; font-weight: bold; }
-dialog input { width: 100%; padding: 5px; margin-top: 4px; border: 1px solid #999; font-size: 13px; }
-.dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
 td.delete-col { padding: 0; }
 .delete-row-btn {
   background: transparent;
@@ -106,3 +141,54 @@ td.delete-col { padding: 0; }
   width: 100%;
 }
 .delete-row-btn:hover { background: #fbe4e4; }
+
+table.grid tbody td textarea {
+  width: 100%;
+  min-width: 160px;
+  border: none;
+  padding: 3px 4px;
+  font-size: 12px;
+  font-family: inherit;
+  resize: vertical;
+  background: transparent;
+}
+table.grid tbody td textarea:focus {
+  outline: 2px solid #2e75b6;
+  background: #fff8dc;
+}
+table.grid tbody td select {
+  width: 100%;
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  text-align: center;
+}
+.radio-group { display: flex; gap: 8px; justify-content: center; }
+.radio-label { display: flex; align-items: center; gap: 3px; font-size: 12px; cursor: pointer; }  
+table.school-grid th, table.school-grid td { white-space: normal; }
+table.school-grid td.text-left { text-align: left; }
+
+dialog { border: 1px solid #999; border-radius: 4px; padding: 16px 20px; width: 320px; }
+dialog h2 { margin-top: 0; font-size: 15px; }
+dialog label { display: block; margin-bottom: 10px; font-size: 12px; font-weight: bold; }
+dialog input { width: 100%; padding: 5px; margin-top: 4px; border: 1px solid #999; font-size: 13px; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+
+
+
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: #eef3fa;
+  border-top: 1px solid #b7c6d9;
+}
+.page-info { font-size: 12px; color: #333; font-weight: bold; margin: 0 6px; }
+
+table.order-grid th, table.order-grid td { font-size: 11px; }
+.summary-tables { padding: 16px; }
+.summary-tables h3 { font-size: 13px; margin: 20px 0 6px 0; color: #1f4e78; }
+table.summary-grid { max-width: 900px; }
+.summary-note { font-size: 11px; color: #666; max-width: 900px; margin-top: 10px; }
+.flag-group { display: flex; justify-content: center; }

@@ -11,7 +11,10 @@ const defaultData = {
   book_types: [],       // { id, category, code, name_english, set_size, sort_order }
   challans: [],          // { id, agent_id, year, s_no, challan_date, challan_no, total_books, items: [{book_type_id, quantity}] }
   returns: [],             // { id, agent_id, year, s_no, return_date, challan_no, books_qty, remark }
-  _seq: { regions: 0, areas: 0, agents: 0, book_types: 0, challans: 0, returns: 0 },
+  schools: [],              // { id, list_type, school_code, school_name_address, ... } — see routes/schools.js for full field list
+  order_rows: [],             // { id, agent_id, cycle_start_year, s_no, school_party_name, party_type, new_school_flag, remark }
+  order_row_years: [],         // { id, order_row_id, year, elig, given, returned, balance, order_amt, order_ret_amt, balance_amt, defaulter, order_cut }
+  _seq: { regions: 0, areas: 0, agents: 0, book_types: 0, challans: 0, returns: 0, schools: 0, order_rows: 0, order_row_years: 0 },
 };
 
 const adapter = new JSONFile(DB_PATH);
@@ -25,6 +28,16 @@ function nextId(collection) {
 async function init() {
   await db.read();
   db.data ||= structuredClone(defaultData);
+  // Defensive backfill: if an existing data.json predates a newer field, add it
+  // instead of crashing. Keeps old data intact while picking up schema additions.
+  for (const key of Object.keys(defaultData)) {
+    if (key === '_seq') continue;
+    db.data[key] ||= [];
+  }
+  db.data._seq ||= {};
+  for (const key of Object.keys(defaultData._seq)) {
+    db.data._seq[key] ||= 0;
+  }
 
   // Seed book types once
   if (db.data.book_types.length === 0) {
@@ -65,6 +78,42 @@ async function init() {
     db.data.agents.push({ id: nextId('agents'), name: 'Ankit Jain', area_id: bplAId, active: 1 });
 
     console.log('Seeded sample regions/areas/agents');
+  }
+
+  // Seed schools once from the real extracted data (3 lists: MASTER, MASTER_NEW, CBSE)
+  if (db.data.schools.length === 0) {
+    const seedSchools = require('./schools-seed.json');
+    for (const rec of seedSchools) {
+      db.data.schools.push({ id: nextId('schools'), ...rec });
+    }
+    console.log(`Seeded ${seedSchools.length} schools`);
+  }
+
+  // Seed 3-year order/specimen detail once, from the real extracted data (Sanjay Gautam, cycle 2024-26)
+  if (db.data.order_rows.length === 0) {
+    const seedOrders = require('./order-details-seed.json');
+    const sanjay = db.data.agents.find(a => a.name === 'Sanjay Gautam');
+    if (sanjay) {
+      for (const rec of seedOrders) {
+        const { years, ...rowFields } = rec;
+        const orderRow = {
+          id: nextId('order_rows'),
+          agent_id: sanjay.id,
+          cycle_start_year: 2024,
+          ...rowFields,
+        };
+        db.data.order_rows.push(orderRow);
+        for (const [year, yearData] of Object.entries(years || {})) {
+          db.data.order_row_years.push({
+            id: nextId('order_row_years'),
+            order_row_id: orderRow.id,
+            year: Number(year),
+            ...yearData,
+          });
+        }
+      }
+      console.log(`Seeded ${seedOrders.length} order detail rows (cycle 2024-26, Sanjay Gautam)`);
+    }
   }
 
   await db.write();
