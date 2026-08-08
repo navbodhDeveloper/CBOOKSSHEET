@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { api } from './api';
+import { api, API_BASE } from './api';
 import Grid from './Grid';
 import NewAgentDialog from './NewAgentDialog';
 
@@ -66,7 +66,7 @@ export default function ChallanModule({ setStatus }) {
 
   function doExport() {
     if (!selectedAgentId || !selectedYear) return;
-    window.location.href = `/api/export/challan-issue?agent_id=${selectedAgentId}&year=${selectedYear}`;
+    window.location.href = `${API_BASE}/api/export/challan-issue?agent_id=${selectedAgentId}&year=${selectedYear}`;
   }
 
   return (

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { api } from './api';
+import { api, API_BASE } from './api';
 
 const LIST_TABS = [
   { key: 'MASTER', label: 'School Master List' },
@@ -133,7 +133,7 @@ export default function SchoolModule({ setStatus }) {
   }
 
   function doExport() {
-    window.location.href = `/api/export/school-list?list_type=${listType}`;
+    window.location.href = `${API_BASE}/api/export/school-list?list_type=${listType}`;
   }
 
   return (

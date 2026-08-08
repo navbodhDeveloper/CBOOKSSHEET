@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, Fragment } from 'react';
-import { api } from './api';
+import { api, API_BASE } from './api';
 
 export default function OrderDetailModule({ setStatus }) {
   const [agents, setAgents] = useState([]);
@@ -139,7 +139,7 @@ export default function OrderDetailModule({ setStatus }) {
 
   function doExport() {
     if (!selectedAgentId || !selectedCycle) return;
-    window.location.href = `/api/export/order-details?agent_id=${selectedAgentId}&cycle_start_year=${selectedCycle}`;
+    window.location.href = `${API_BASE}/api/export/order-details?agent_id=${selectedAgentId}&cycle_start_year=${selectedCycle}`;
   }
 
   const years = selectedCycle ? [selectedCycle, selectedCycle + 1, selectedCycle + 2] : [];
