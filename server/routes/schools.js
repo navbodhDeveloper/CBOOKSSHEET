@@ -33,6 +33,17 @@ const FIELDS = [
   'supplying_party', 'discussion_2023', 'discussion_2024', 'remark',
 ];
 
+function cellToValue(v) {
+  if (v == null) return '';
+  if (typeof v === 'object') {
+    if (Array.isArray(v.richText)) return v.richText.map(rt => rt.text).join('');
+    if (v.text !== undefined) return v.text;
+    if (v.result !== undefined) return v.result; // formula result
+    return '';
+  }
+  return v;
+}
+
 function pickFields(body) {
   const out = {};
   for (const f of FIELDS) {
@@ -138,19 +149,16 @@ router.post('/import', async (req, res) => {
     let skipped = 0;
     sheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
       if (rowNumber < 4) return; // skip title/list/header rows
-      const nameCell = row.getCell(3).value; // col 3 = School Name / Address
-      if (!nameCell) return;
+      const name = cellToValue(row.getCell(3).value); // col 3 = School Name / Address
+      if (!name) return;
 
-      const codeCell = row.getCell(2).value;
-      if (findDuplicate(list_type, codeCell, nameCell, null)) { skipped++; return; }
+      const code = cellToValue(row.getCell(2).value);
+      if (findDuplicate(list_type, code, name, null)) { skipped++; return; }
 
       const rec = { id: nextId('schools'), agent_id: Number(agent_id), list_type };
       IMPORT_COLUMNS.forEach((field, idx) => {
         if (!field) return;
-        const cell = row.getCell(idx + 2); // +2: col1=S.N., col2=first data field
-        let v = cell.value;
-        if (v && typeof v === 'object' && v.text) v = v.text; // rich text cells
-        rec[field] = v ?? '';
+        rec[field] = cellToValue(row.getCell(idx + 2).value); // +2: col1=S.N., col2=first data field
       });
       db.data.schools.push(rec);
       imported++;
@@ -161,6 +169,31 @@ router.post('/import', async (req, res) => {
   } catch (err) {
     res.status(400).json({ error: 'Could not read file: ' + err.message });
   }
+});
+
+// POST /api/schools/dedupe?list_type=MASTER
+// Removes existing duplicate rows (same School Code + School Name/Address, case/whitespace-insensitive)
+// within a list, keeping the earliest one. One-time cleanup for data added before duplicate checking existed.
+router.post('/dedupe', async (req, res) => {
+  const { list_type } = req.body;
+  if (!list_type) return res.status(400).json({ error: 'list_type is required' });
+
+  const seen = new Map(); // key -> kept school
+  const toRemove = [];
+  for (const s of db.data.schools) {
+    if (s.list_type !== list_type) continue;
+    const key = `${(s.school_code || '').trim().toLowerCase()}|${(s.school_name_address || '').trim().toLowerCase()}`;
+    if (!key.trim() || key === '|') continue; // skip blank rows, nothing to dedupe on
+    if (seen.has(key)) {
+      toRemove.push(s.id);
+    } else {
+      seen.set(key, s);
+    }
+  }
+
+  db.data.schools = db.data.schools.filter(s => !toRemove.includes(s.id));
+  await db.write();
+  res.json({ removed: toRemove.length });
 });
 
 module.exports = router;

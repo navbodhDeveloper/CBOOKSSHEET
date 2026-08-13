@@ -40,10 +40,10 @@ const COLUMNS = [
   ['order_2023', '23 Order'],
   ['vapasi_2023', '23 Vapasi'],
   ['NET_ORDER_2023', '23 Net Order'],
-  ['yog_amt', 'Yog'],
-  ['ayog_amt', 'Ayog'],
-  ['total_amt', 'Total'],
-  ['REMAINING', 'Remaning'],
+  ['yog_amt', 'Y'],
+  ['ayog_amt', 'A'],
+  ['total_amt', 'T'],
+  ['REMAINING', 'R'],
   ['supplying_party', 'Supplying Party'],
   ['discussion_2023', 'Discussion 2023'],
   ['discussion_2024', 'Discussion 2024'],
@@ -199,6 +199,18 @@ export default function SchoolModule({ setStatus }) {
     window.location.href = `${API_BASE}/api/export/school-list?${qs.toString()}`;
   }
 
+  async function handleDedupe() {
+    if (!window.confirm(`Remove duplicate schools from "${listType}"? This keeps the first copy of each and deletes the rest. This cannot be undone.`)) return;
+    try {
+      const result = await api('/schools/dedupe', { method: 'POST', body: JSON.stringify({ list_type: listType }) });
+      setStatus(`Removed ${result.removed} duplicate rows`);
+      await load(listType, selectedAgentId);
+    } catch (err) {
+      setStatus(err.message, true);
+      window.alert(err.message);
+    }
+  }
+
   function handleImportClick() {
     if (!selectedAgentId) { setStatus('Select an Area first — imported schools need an owning agent', true); return; }
     fileInputRef.current?.click();
@@ -293,6 +305,7 @@ export default function SchoolModule({ setStatus }) {
           onChange={handleFileSelected}
         />
         <button className="secondary" onClick={doExport}>⬇ Export to Excel</button>
+        <button className="secondary" onClick={handleDedupe}>🧹 Clean Duplicates</button>
         <span className="status">{loading ? 'Loading...' : `${filtered.length} schools`}</span>
       </section>
 
