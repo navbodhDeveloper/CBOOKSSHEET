@@ -4,7 +4,8 @@ const path = require('path');
 const { init } = require('./db');
 const schoolRoutes = require('./routes/schools');
 const exportSchoolsRoutes = require('./routes/export-schools');
-
+const partyRoutes = require('./routes/parties');
+const exportPartiesRoutes = require('./routes/export-parties');
 const metaRoutes = require('./routes/meta');
 const challanRoutes = require('./routes/challans');
 const exportRoutes = require('./routes/export');
@@ -16,7 +17,7 @@ async function start() {
 
   const app = express();
   app.use(cors());
-  app.use(express.json());
+  app.use(express.json({ limit: '15mb' }));
 
 
   app.use('/api/order-details', orderDetailRoutes);
@@ -24,6 +25,8 @@ async function start() {
   app.use('/api/schools', schoolRoutes);
   app.use('/api/export', exportSchoolsRoutes);
   app.use('/api', metaRoutes);
+  app.use('/api/parties', partyRoutes);
+  app.use('/api/export', exportPartiesRoutes);
   app.use('/api/challans', challanRoutes);
   app.use('/api/export', exportRoutes);
   app.get('/health', (req, res) => res.json({ ok: true }));

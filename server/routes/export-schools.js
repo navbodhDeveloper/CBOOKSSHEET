@@ -9,7 +9,7 @@ const LIST_LABELS = {
   CBSE: 'CBSE',
 };
 
-// Column definitions: [field, header label, width]
+// [field, header label, width] — 'null' field = computed column
 const COLUMNS = [
   ['school_code', 'School Code', 14],
   ['school_name_address', 'School Name / Address', 40],
@@ -25,29 +25,41 @@ const COLUMNS = [
   ['specimen_returned_2021', 'Specimen Returned 2021', 10],
   ['specimen_returned_2022', 'Specimen Returned 2022', 10],
   ['specimen_returned_2023', 'Specimen Returned 2023', 10],
-  ['books_finalized_2021', 'Books Finalized 2021', 10],
-  ['books_finalized_2022', 'Books Finalized 2022', 10],
-  ['books_finalized_2023', 'Books Finalized 2023', 10],
-  ['gift_given', 'Gift Given', 8],
-  ['visit_1', 'Visit I (Date/Location)', 20],
-  ['visit_2', 'Visit II (Date/Location)', 20],
-  ['visit_3', 'Visit III (Date/Location)', 20],
-  ['dist_2024_distributed', '2024 Distributed', 10],
-  ['dist_2024_returned', '2024 Returned', 10],
-  ['dist_2024_net', '2024 Net', 10],
+  [null, '2021 NET SPE', 10, s => (Number(s.specimen_given_2021) || 0) - (Number(s.specimen_returned_2021) || 0)],
+  [null, '2022 NET SPE', 10, s => (Number(s.specimen_given_2022) || 0) - (Number(s.specimen_returned_2022) || 0)],
+  [null, '2023 NET SPE', 10, s => (Number(s.specimen_given_2023) || 0) - (Number(s.specimen_returned_2023) || 0)],
+  ['visit_1', '(Date/Location)', 16],
+  ['visit_2', '(Date/Location)', 16],
+  ['visit_3', '(Date/Location)', 16],
+  ['order_2021', '21 Order', 10],
+  ['vapasi_2021', '21 Vapasi', 10],
+  [null, '21 Net Order', 10, s => (Number(s.order_2021) || 0) - (Number(s.vapasi_2021) || 0)],
+  ['order_2022', '22 Order', 10],
+  ['vapasi_2022', '22 Vapasi', 10],
+  [null, '22 Net Order', 10, s => (Number(s.order_2022) || 0) - (Number(s.vapasi_2022) || 0)],
+  ['order_2023', '23 Order', 10],
+  ['vapasi_2023', '23 Vapasi', 10],
+  [null, '23 Net Order', 10, s => (Number(s.order_2023) || 0) - (Number(s.vapasi_2023) || 0)],
+  ['yog_amt', 'Yog', 8],
+  ['ayog_amt', 'Ayog', 8],
+  ['total_amt', 'Total', 8],
+  [null, 'Remaining', 8, s => (Number(s.total_amt) || 0) - (Number(s.yog_amt) || 0) - (Number(s.ayog_amt) || 0)],
   ['supplying_party', 'Supplying Party', 16],
+  ['discussion_2023', 'Discussion 2023', 24],
   ['discussion_2024', 'Discussion 2024', 24],
   ['remark', 'Remark', 20],
 ];
 
 router.get('/school-list', async (req, res) => {
-  const { list_type } = req.query;
+  const { list_type, agent_id } = req.query;
   if (!list_type || !LIST_LABELS[list_type]) {
     return res.status(400).json({ error: 'valid list_type is required (MASTER, MASTER_NEW, or CBSE)' });
   }
 
-  const schools = db.data.schools
-    .filter(s => s.list_type === list_type)
+  let schools = db.data.schools
+    .filter(s => s.list_type === list_type);
+  if (agent_id) schools = schools.filter(s => String(s.agent_id) === String(agent_id));
+  schools = schools
     .sort((a, b) => a.id - b.id);
 
   const workbook = new ExcelJS.Workbook();
@@ -79,8 +91,8 @@ router.get('/school-list', async (req, res) => {
   schools.forEach((school, i) => {
     const r = headerRow + 1 + i;
     sheet.getCell(r, 1).value = i + 1;
-    COLUMNS.forEach(([field], idx) => {
-      const val = school[field];
+    COLUMNS.forEach(([field, , , compute], idx) => {
+      const val = compute ? compute(school) : school[field];
       if (val !== null && val !== undefined && val !== '') {
         sheet.getCell(r, idx + 2).value = val;
       }

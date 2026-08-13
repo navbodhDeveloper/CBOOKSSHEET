@@ -6,6 +6,8 @@ import NewAgentDialog from './NewAgentDialog';
 export default function ChallanModule({ setStatus }) {
   const [agents, setAgents] = useState([]);
   const [bookTypes, setBookTypes] = useState([]);
+  const [states, setStates] = useState(['MP', 'CG']);
+  const [selectedState, setSelectedState] = useState('MP');
   const [agentSearch, setAgentSearch] = useState('');
   const [year, setYear] = useState(new Date().getFullYear());
   const [selectedAgentId, setSelectedAgentId] = useState(null);
@@ -15,9 +17,10 @@ export default function ChallanModule({ setStatus }) {
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const loadMeta = useCallback(async () => {
-    const [ag, bt] = await Promise.all([api('/agents'), api('/book-types')]);
+    const [ag, bt, st] = await Promise.all([api('/agents'), api('/book-types'), api('/states')]);
     setAgents(ag);
     setBookTypes(bt);
+    setStates(st.length ? st : ['MP', 'CG']);
   }, []);
 
   useEffect(() => {
@@ -28,8 +31,10 @@ export default function ChallanModule({ setStatus }) {
   const currentYear = new Date().getFullYear();
   for (let y = currentYear - 3; y <= currentYear + 1; y++) years.push(y);
 
+  const agentsInState = agents.filter(a => (a.state || 'MP') === selectedState);
+
   function resolveAgentId() {
-    const match = agents.find(a => `${a.name} (${a.area_label})` === agentSearch);
+    const match = agentsInState.find(a => `${a.name} (${a.area_label})` === agentSearch);
     return match ? match.id : null;
   }
 
@@ -53,9 +58,9 @@ export default function ChallanModule({ setStatus }) {
     setStatus('Sheet loaded');
   }
 
-  async function handleCreateAgent({ name, region_name, area_code }) {
+  async function handleCreateAgent({ name, state, region_name, area_code }) {
     try {
-      await api('/agents', { method: 'POST', body: JSON.stringify({ name, region_name, area_code }) });
+      await api('/agents', { method: 'POST', body: JSON.stringify({ name, state, region_name, area_code }) });
       setStatus('Agent created');
       setDialogOpen(false);
       await loadMeta();
@@ -75,6 +80,16 @@ export default function ChallanModule({ setStatus }) {
 
       <section className="controls">
         <div className="field">
+          <label htmlFor="stateSelect">State</label>
+          <select
+            id="stateSelect"
+            value={selectedState}
+            onChange={(e) => { setSelectedState(e.target.value); setAgentSearch(''); }}
+          >
+            {states.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
+        <div className="field">
           <label htmlFor="agentSearch">Agent Name &amp; Area</label>
           <input
             id="agentSearch"
@@ -85,7 +100,7 @@ export default function ChallanModule({ setStatus }) {
             onChange={(e) => setAgentSearch(e.target.value)}
           />
           <datalist id="agentList">
-            {agents.map(a => (
+            {agentsInState.map(a => (
               <option key={a.id} value={`${a.name} (${a.area_label})`} />
             ))}
           </datalist>
@@ -103,7 +118,6 @@ export default function ChallanModule({ setStatus }) {
 
       {sheetLoaded && (
         <Grid
-          bookTypes={bookTypes}
           rows={rows}
           setRows={setRows}
           agentId={selectedAgentId}

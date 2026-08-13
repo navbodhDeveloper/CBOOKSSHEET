@@ -9,7 +9,7 @@ const LIST_TABS = [
 
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 
-// [field, header label]
+// [field, header label] — stored fields
 const COLUMNS = [
   ['school_code', 'School Code'],
   ['school_name_address', 'School Name / Address'],
@@ -25,30 +25,50 @@ const COLUMNS = [
   ['specimen_returned_2021', 'Specimen Returned 2021'],
   ['specimen_returned_2022', 'Specimen Returned 2022'],
   ['specimen_returned_2023', 'Specimen Returned 2023'],
-  ['books_finalized_2021', 'Books Finalized 2021'],
-  ['books_finalized_2022', 'Books Finalized 2022'],
-  ['books_finalized_2023', 'Books Finalized 2023'],
-  ['gift_given', 'Gift Given'],
-  ['visit_1', 'Visit I (Date/Location)'],
-  ['visit_2', 'Visit II (Date/Location)'],
-  ['visit_3', 'Visit III (Date/Location)'],
-  ['dist_2024_distributed', '2024 Distributed'],
-  ['dist_2024_returned', '2024 Returned'],
-  ['dist_2024_net', '2024 Net'],
+  ['NET_SPE_2021', '2021 NET SPE'],
+  ['NET_SPE_2022', '2022 NET SPE'],
+  ['NET_SPE_2023', '2023 NET SPE'],
+  ['visit_1', '(Date/Location)'],
+  ['visit_2', '(Date/Location)'],
+  ['visit_3', '(Date/Location)'],
+  ['order_2021', '21 Order'],
+  ['vapasi_2021', '21 Vapasi'],
+  ['NET_ORDER_2021', '21 Net Order'],
+  ['order_2022', '22 Order'],
+  ['vapasi_2022', '22 Vapasi'],
+  ['NET_ORDER_2022', '22 Net Order'],
+  ['order_2023', '23 Order'],
+  ['vapasi_2023', '23 Vapasi'],
+  ['NET_ORDER_2023', '23 Net Order'],
+  ['yog_amt', 'Yog'],
+  ['ayog_amt', 'Ayog'],
+  ['total_amt', 'Total'],
+  ['REMAINING', 'Remaning'],
   ['supplying_party', 'Supplying Party'],
+  ['discussion_2023', 'Discussion 2023'],
   ['discussion_2024', 'Discussion 2024'],
   ['remark', 'Remark'],
 ];
 
+// Computed, read-only: NET_SPE = given - returned, NET_ORDER = order - vapasi
+const COMPUTED = {
+  NET_SPE_2021: s => (Number(s.specimen_given_2021) || 0) - (Number(s.specimen_returned_2021) || 0),
+  NET_SPE_2022: s => (Number(s.specimen_given_2022) || 0) - (Number(s.specimen_returned_2022) || 0),
+  NET_SPE_2023: s => (Number(s.specimen_given_2023) || 0) - (Number(s.specimen_returned_2023) || 0),
+  NET_ORDER_2021: s => (Number(s.order_2021) || 0) - (Number(s.vapasi_2021) || 0),
+  NET_ORDER_2022: s => (Number(s.order_2022) || 0) - (Number(s.vapasi_2022) || 0),
+  NET_ORDER_2023: s => (Number(s.order_2023) || 0) - (Number(s.vapasi_2023) || 0),
+  REMAINING: s => (Number(s.total_amt) || 0) - (Number(s.yog_amt) || 0) - (Number(s.ayog_amt) || 0),
+};
+
 const NUMERIC_FIELDS = new Set([
   'specimen_given_2021', 'specimen_given_2022', 'specimen_given_2023',
   'specimen_returned_2021', 'specimen_returned_2022', 'specimen_returned_2023',
-  'books_finalized_2021', 'books_finalized_2022', 'books_finalized_2023',
-  'dist_2024_distributed', 'dist_2024_returned', 'dist_2024_net',
+  'order_2021', 'vapasi_2021', 'order_2022', 'vapasi_2022', 'order_2023', 'vapasi_2023',
+  'yog_amt', 'ayog_amt', 'total_amt',
 ]);
-const TEXTAREA_FIELDS = new Set(['school_name_address', 'principal_name_mobile', 'discussion_2024', 'remark']);
+const TEXTAREA_FIELDS = new Set(['school_name_address', 'principal_name_mobile', 'discussion_2023', 'discussion_2024', 'remark']);
 const MONTH_FIELDS = new Set(['specimen_give_month', 'book_delivery_month']);
-const RADIO_FIELDS = new Set(['gift_given']);
 
 export default function SchoolModule({ setStatus }) {
   const [listType, setListType] = useState('MASTER');
@@ -57,12 +77,52 @@ export default function SchoolModule({ setStatus }) {
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
+  const [importing, setImporting] = useState(false);
   const saveTimers = useRef({});
+  const fileInputRef = useRef(null);
 
-  const load = useCallback(async (lt) => {
+  const [states, setStates] = useState(['MP', 'CG']);
+  const [selectedState, setSelectedState] = useState('MP');
+  const [areas, setAreas] = useState([]);
+  const [selectedAreaId, setSelectedAreaId] = useState('');
+  const [agents, setAgents] = useState([]);
+
+  // Load states + agents once
+  useEffect(() => {
+    (async () => {
+      try {
+        const [st, ag] = await Promise.all([api('/states'), api('/agents')]);
+        setStates(st.length ? st : ['MP', 'CG']);
+        setAgents(ag);
+      } catch (err) {
+        setStatus(err.message, true);
+      }
+    })();
+  }, [setStatus]);
+
+  // Load areas whenever the state changes, and auto-pick the first one
+  useEffect(() => {
+    (async () => {
+      try {
+        const ar = await api(`/areas?state=${selectedState}`);
+        setAreas(ar);
+        setSelectedAreaId(ar.length ? String(ar[0].id) : '');
+      } catch (err) {
+        setStatus(err.message, true);
+      }
+    })();
+  }, [selectedState, setStatus]);
+
+  // The agent is auto-derived from the selected area (each area has exactly one agent)
+  const selectedAgent = agents.find(a => String(a.area_id) === String(selectedAreaId)) || null;
+  const selectedAgentId = selectedAgent?.id ?? null;
+
+  const load = useCallback(async (lt, agentId) => {
     setLoading(true);
     try {
-      const data = await api(`/schools?list_type=${lt}`);
+      const qs = new URLSearchParams({ list_type: lt });
+      if (agentId) qs.set('agent_id', agentId);
+      const data = await api(`/schools?${qs.toString()}`);
       setSchools(data);
     } catch (err) {
       setStatus(err.message, true);
@@ -71,7 +131,7 @@ export default function SchoolModule({ setStatus }) {
     }
   }, [setStatus]);
 
-  useEffect(() => { load(listType); setPage(1); }, [listType, load]);
+  useEffect(() => { load(listType, selectedAgentId); setPage(1); }, [listType, selectedAgentId, load]);
   useEffect(() => { setPage(1); }, [search, pageSize]);
 
   const filtered = search.trim()
@@ -108,12 +168,13 @@ export default function SchoolModule({ setStatus }) {
       setStatus('Saved');
     } catch (err) {
       setStatus(err.message, true);
+      window.alert(err.message);
     }
   }
 
   function addBlankSchool() {
     const tempId = `new-${Date.now()}`;
-    const blank = { id: tempId, list_type: listType };
+    const blank = { id: tempId, list_type: listType, agent_id: selectedAgentId };
     for (const [field] of COLUMNS) blank[field] = '';
     setSchools(prev => [blank, ...prev]);
     setPage(1);
@@ -133,7 +194,40 @@ export default function SchoolModule({ setStatus }) {
   }
 
   function doExport() {
-    window.location.href = `${API_BASE}/api/export/school-list?list_type=${listType}`;
+    const qs = new URLSearchParams({ list_type: listType });
+    if (selectedAgentId) qs.set('agent_id', selectedAgentId);
+    window.location.href = `${API_BASE}/api/export/school-list?${qs.toString()}`;
+  }
+
+  function handleImportClick() {
+    if (!selectedAgentId) { setStatus('Select an Area first — imported schools need an owning agent', true); return; }
+    fileInputRef.current?.click();
+  }
+
+  async function handleFileSelected(e) {
+    const file = e.target.files[0];
+    e.target.value = ''; // allow re-selecting the same file later
+    if (!file) return;
+
+    setImporting(true);
+    try {
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const result = await api('/schools/import', {
+        method: 'POST',
+        body: JSON.stringify({ list_type: listType, agent_id: selectedAgentId, fileBase64: base64 }),
+      });
+      setStatus(`Imported ${result.imported} schools${result.skipped ? `, skipped ${result.skipped} duplicates` : ''}`);
+      await load(listType, selectedAgentId);
+    } catch (err) {
+      setStatus(err.message, true);
+    } finally {
+      setImporting(false);
+    }
   }
 
   return (
@@ -141,6 +235,23 @@ export default function SchoolModule({ setStatus }) {
       <div className="module-title">School Master List</div>
 
       <section className="controls">
+        <div className="field">
+          <label htmlFor="schoolStateSelect">State</label>
+          <select id="schoolStateSelect" value={selectedState} onChange={(e) => setSelectedState(e.target.value)}>
+            {states.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor="schoolAreaSelect">Area</label>
+          <select id="schoolAreaSelect" value={selectedAreaId} onChange={(e) => setSelectedAreaId(e.target.value)}>
+            {areas.length === 0 && <option value="">No areas</option>}
+            {areas.map(a => <option key={a.id} value={a.id}>{a.label}</option>)}
+          </select>
+        </div>
+        <div className="field">
+          <label>Agent</label>
+          <input type="text" value={selectedAgent?.name || '—'} readOnly disabled />
+        </div>
         <div className="tabs">
           {LIST_TABS.map(t => (
             <button
@@ -171,6 +282,16 @@ export default function SchoolModule({ setStatus }) {
           </select>
         </div>
         <button onClick={addBlankSchool}>+ Add School</button>
+        <button className="secondary" onClick={handleImportClick} disabled={importing}>
+          {importing ? 'Importing...' : '⬆ Import from Excel'}
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".xlsx"
+          style={{ display: 'none' }}
+          onChange={handleFileSelected}
+        />
         <button className="secondary" onClick={doExport}>⬇ Export to Excel</button>
         <span className="status">{loading ? 'Loading...' : `${filtered.length} schools`}</span>
       </section>
@@ -223,20 +344,8 @@ function SchoolRow({ school, index, updateLocal, queueSave, onDelete }) {
       <td>{index + 1}</td>
       {COLUMNS.map(([field]) => (
         <td key={field} className={TEXTAREA_FIELDS.has(field) ? 'text-left' : ''}>
-          {RADIO_FIELDS.has(field) ? (
-            <div className="radio-group">
-              {['Y', 'N'].map(opt => (
-                <label key={opt} className="radio-label">
-                  <input
-                    type="radio"
-                    name={`${field}-${school.id}`}
-                    checked={school[field] === opt}
-                    onChange={() => handleChange(field, opt)}
-                  />
-                  {opt}
-                </label>
-              ))}
-            </div>
+          {COMPUTED[field] ? (
+            <span className="computed-cell">{COMPUTED[field](school)}</span>
           ) : MONTH_FIELDS.has(field) ? (
             <select value={school[field] || ''} onChange={(e) => handleChange(field, e.target.value)}>
               <option value=""></option>

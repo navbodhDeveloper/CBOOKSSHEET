@@ -7,13 +7,15 @@ router.get('/regions', (req, res) => {
 });
 
 router.get('/areas', (req, res) => {
-  const { region_id } = req.query;
+  const { region_id, state } = req.query;
   let areas = db.data.areas;
   if (region_id) areas = areas.filter(a => String(a.region_id) === String(region_id));
-  const withRegion = areas.map(a => ({
-    ...a,
-    region_name: db.data.regions.find(r => r.id === a.region_id)?.name,
-  }));
+  let withRegion = areas.map(a => {
+    const region = db.data.regions.find(r => r.id === a.region_id);
+    return { ...a, region_name: region?.name, state: region?.state || 'MP' };
+  });
+  if (state) withRegion = withRegion.filter(a => a.state === state);
+  withRegion.sort((a, b) => a.label.localeCompare(b.label));
   res.json(withRegion);
 });
 
@@ -30,14 +32,24 @@ router.get('/agents', (req, res) => {
         area_id: area?.id,
         area_label: area?.label,
         region_name: region?.name,
+        state: region?.state || 'MP',
       };
     })
     .sort((a, b) => (a.region_name || '').localeCompare(b.region_name || '') || a.name.localeCompare(b.name));
   res.json(rows);
 });
 
+// GET /api/states — distinct states currently in use, for the state filter dropdown
+router.get('/states', (req, res) => {
+  const states = new Set(db.data.regions.map(r => r.state || 'MP'));
+  // Always offer both, even before any CG agent exists, so the filter is usable immediately
+  states.add('MP');
+  states.add('CG');
+  res.json([...states].sort());
+});
+
 router.post('/agents', async (req, res) => {
-  const { name, area_id, region_name, area_code } = req.body;
+  const { name, area_id, region_name, area_code, state } = req.body;
   if (!name) return res.status(400).json({ error: 'name is required' });
 
   let finalAreaId = area_id;
@@ -45,8 +57,10 @@ router.post('/agents', async (req, res) => {
   if (!finalAreaId && region_name && area_code) {
     let region = db.data.regions.find(r => r.name === region_name);
     if (!region) {
-      region = { id: nextId('regions'), name: region_name };
+      region = { id: nextId('regions'), name: region_name, state: state || 'MP' };
       db.data.regions.push(region);
+    } else if (state && !region.state) {
+      region.state = state;
     }
     let area = db.data.areas.find(a => a.region_id === region.id && a.code === area_code);
     if (!area) {

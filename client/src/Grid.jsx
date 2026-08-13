@@ -1,13 +1,10 @@
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useCallback } from 'react';
 import { api } from './api';
 
-export default function Grid({ bookTypes, rows, setRows, agentId, year, setStatus }) {
-  const navbodh = bookTypes.filter(b => b.category === 'नवबोध सेट');
-  const gyanbodh = bookTypes.filter(b => b.category === 'ज्ञानबोध सेट');
-  const special = bookTypes.find(b => b.code === 'SPECIAL_SET');
-  const loose = bookTypes.find(b => b.code === 'LOOSE_BOOK');
-  const orderedTypes = [...navbodh, ...gyanbodh];
+// Column layout: S.N.(0) Date(1) Challan No.(2) Total Books(3) | Return Date(4) Return Challan No.(5) Return Qty(6) Remark(7)
+const COL_COUNT = 8;
 
+export default function Grid({ rows, setRows, agentId, year, setStatus }) {
   // refs[rowIndex][colIndex] -> input DOM element
   const refsMap = useRef(new Map());
   const saveQueue = useRef(Promise.resolve());
@@ -22,8 +19,6 @@ export default function Grid({ bookTypes, rows, setRows, agentId, year, setStatu
     const el = refsMap.current.get(`${rowIndex}-${colIndex}`);
     if (el) el.focus();
   };
-
-  const colCount = 3 + orderedTypes.length + 2 + 1 + 4; // s_no,date,challan_no + types + special+loose + total + 4 return fields
 
   const addBlankRow = useCallback(() => {
     setRows(prev => [...prev, { rowKey: `row-new-${Date.now()}-${Math.random()}`, challan: null, ret: null }]);
@@ -49,7 +44,6 @@ export default function Grid({ bookTypes, rows, setRows, agentId, year, setStatu
       e.preventDefault();
       if (rowIndex === rows.length - 1) {
         addBlankRow();
-        // wait a tick for the new row to render
         setTimeout(() => focusCell(rowIndex + 1, colIndex), 0);
       } else {
         focusCell(rowIndex + 1, colIndex);
@@ -66,6 +60,21 @@ export default function Grid({ bookTypes, rows, setRows, agentId, year, setStatu
       .catch(err => setStatus(err.message, true));
   }
 
+  function fieldColIndex(section, field) {
+    if (section === 'challan') {
+      if (field === 's_no') return 0;
+      if (field === 'challan_date') return 1;
+      if (field === 'challan_no') return 2;
+      if (field === 'total_books') return 3;
+    } else if (section === 'ret') {
+      if (field === 'return_date') return 4;
+      if (field === 'return_challan_no') return 5;
+      if (field === 'return_books_qty') return 6;
+      if (field === 'remark') return 7;
+    }
+    return -1;
+  }
+
   async function saveSection(rowIndex, section) {
     const row = rows[rowIndex];
     const getVal = (field) => {
@@ -79,19 +88,15 @@ export default function Grid({ bookTypes, rows, setRows, agentId, year, setStatu
       const challan_no = getVal('challan_no');
       const s_no = getVal('s_no');
       const total_books = getVal('total_books');
-      const items = bookTypes.map(bt => ({
-        book_type_id: bt.id,
-        quantity: Number(getVal(`item_${bt.id}`)) || 0,
-      }));
-      const hasAnyData = challan_date || challan_no || total_books || items.some(i => i.quantity);
+      const hasAnyData = challan_date || challan_no || total_books;
       if (!hasAnyData) return;
       if (!challan_date || !challan_no) return;
 
       const payload = {
         agent_id: agentId, year,
         s_no: s_no ? Number(s_no) : null, challan_date, challan_no,
-        total_books: total_books ? Number(total_books) : items.reduce((s, i) => s + i.quantity, 0),
-        items,
+        total_books: total_books ? Number(total_books) : 0,
+        items: [],
       };
 
       let newChallan;
@@ -102,7 +107,6 @@ export default function Grid({ bookTypes, rows, setRows, agentId, year, setStatu
         const { id } = await api('/challans', { method: 'POST', body: JSON.stringify(payload) });
         newChallan = { id, ...payload };
       }
-      newChallan.items = items.map(i => ({ ...i, ...bookTypes.find(b => b.id === i.book_type_id) }));
 
       setRows(prev => {
         const next = [...prev];
@@ -141,46 +145,11 @@ export default function Grid({ bookTypes, rows, setRows, agentId, year, setStatu
     setStatus('Saved');
   }
 
-  // Maps a (section, field) pair to its column index in the row, for keyboard nav / ref lookup
-  function fieldColIndex(section, field) {
-    if (section === 'challan') {
-      if (field === 's_no') return 0;
-      if (field === 'challan_date') return 1;
-      if (field === 'challan_no') return 2;
-      if (field.startsWith('item_')) {
-        const btId = Number(field.replace('item_', ''));
-        const idx = bookTypes.findIndex(b => b.id === btId);
-        // map to orderedTypes/special/loose position
-        const bt = bookTypes.find(b => b.id === btId);
-        if (bt.code === 'SPECIAL_SET') return 3 + orderedTypes.length;
-        if (bt.code === 'LOOSE_BOOK') return 3 + orderedTypes.length + 1;
-        const oIdx = orderedTypes.findIndex(o => o.id === btId);
-        return 3 + oIdx;
-      }
-      if (field === 'total_books') return 3 + orderedTypes.length + 2;
-    } else if (section === 'ret') {
-      const base = 3 + orderedTypes.length + 3;
-      if (field === 'return_date') return base;
-      if (field === 'return_challan_no') return base + 1;
-      if (field === 'return_books_qty') return base + 2;
-      if (field === 'remark') return base + 3;
-    }
-    return -1;
-  }
-
   // ---------- Totals ----------
-  const typeSums = {};
-  for (const bt of orderedTypes) typeSums[bt.id] = 0;
-  let specialSum = 0, looseSum = 0, totalBooks = 0, totalReturn = 0;
+  let totalBooks = 0, totalReturn = 0;
   rows.forEach(row => {
     totalBooks += Number(row.challan?.total_books) || 0;
     totalReturn += Number(row.ret?.books_qty) || 0;
-    for (const bt of orderedTypes) {
-      const q = row.challan?.items?.find(it => it.book_type_id === bt.id)?.quantity;
-      typeSums[bt.id] += Number(q) || 0;
-    }
-    if (special) specialSum += Number(row.challan?.items?.find(it => it.book_type_id === special.id)?.quantity) || 0;
-    if (loose) looseSum += Number(row.challan?.items?.find(it => it.book_type_id === loose.id)?.quantity) || 0;
   });
 
   return (
@@ -189,21 +158,13 @@ export default function Grid({ bookTypes, rows, setRows, agentId, year, setStatu
         <table className="grid">
           <thead>
             <tr className="group-row">
-              <th colSpan={3}>जावक</th>
-              <th colSpan={navbodh.length}>नवबोध सेट</th>
-              <th colSpan={gyanbodh.length}>ज्ञानबोध सेट</th>
-              <th colSpan={3}></th>
+              <th colSpan={4}>जावक</th>
               <th colSpan={4} className="section-divider">आवक/वापसी</th>
             </tr>
             <tr>
-              <th>S.N.</th><th>Date</th><th>Challan No.</th>
-              {orderedTypes.map(bt => (
-                <th key={bt.id} title={bt.set_size ? `${bt.set_size} Books/Set` : ''}>
-                  {bt.name_english}{bt.set_size ? <><br /><small>({bt.set_size} Books)</small></> : null}
-                </th>
-              ))}
-              <th>Special Set</th>
-              <th>Loose Book</th>
+              <th>S.N.</th>
+              <th>Date</th>
+              <th>Challan No.</th>
               <th>किताबों की संख्या</th>
               <th className="section-divider">दिनांक</th>
               <th>चालान क्रमांक</th>
@@ -218,9 +179,6 @@ export default function Grid({ bookTypes, rows, setRows, agentId, year, setStatu
                 key={row.rowKey ?? rIdx}
                 row={row}
                 rowIndex={rIdx}
-                orderedTypes={orderedTypes}
-                special={special}
-                loose={loose}
                 setInputRef={setInputRef}
                 handleKeyDown={handleKeyDown}
                 queueSave={queueSave}
@@ -231,9 +189,6 @@ export default function Grid({ bookTypes, rows, setRows, agentId, year, setStatu
           <tfoot>
             <tr>
               <td colSpan={3}>TOTAL:-</td>
-              {orderedTypes.map(bt => <td key={bt.id}>{typeSums[bt.id] || ''}</td>)}
-              <td>{specialSum || ''}</td>
-              <td>{looseSum || ''}</td>
               <td>{totalBooks || ''}</td>
               <td className="section-divider"></td>
               <td>TOTAL:-</td>
@@ -251,9 +206,7 @@ export default function Grid({ bookTypes, rows, setRows, agentId, year, setStatu
   );
 }
 
-function Row({ row, rowIndex, orderedTypes, special, loose, setInputRef, handleKeyDown, queueSave, onDelete }) {
-  let col = 0;
-
+function Row({ row, rowIndex, setInputRef, handleKeyDown, queueSave, onDelete }) {
   const numInput = (defaultValue, section, colIndex, extraClass = '') => {
     const c = colIndex;
     return (
@@ -302,35 +255,19 @@ function Row({ row, rowIndex, orderedTypes, special, loose, setInputRef, handleK
     );
   };
 
-  const cells = [];
-  cells.push(numInput(row.challan?.s_no ?? rowIndex + 1, 'challan', col++));
-  cells.push(dateInput(row.challan?.challan_date ?? '', 'challan', col++));
-  cells.push(textInput(row.challan?.challan_no ?? '', 'challan', col++));
-
-  for (const bt of orderedTypes) {
-    const q = row.challan?.items?.find(it => it.book_type_id === bt.id)?.quantity ?? '';
-    cells.push(numInput(q, 'challan', col++));
-  }
-  if (special) {
-    const q = row.challan?.items?.find(it => it.book_type_id === special.id)?.quantity ?? '';
-    cells.push(numInput(q, 'challan', col++));
-  }
-  if (loose) {
-    const q = row.challan?.items?.find(it => it.book_type_id === loose.id)?.quantity ?? '';
-    cells.push(numInput(q, 'challan', col++));
-  }
-  cells.push(numInput(row.challan?.total_books ?? '', 'challan', col++));
-
-  cells.push(dateInput(row.ret?.return_date ?? '', 'ret', col++, 'section-divider'));
-  cells.push(textInput(row.ret?.challan_no ?? '', 'ret', col++));
-  cells.push(numInput(row.ret?.books_qty ?? '', 'ret', col++));
-  cells.push(textInput(row.ret?.remark ?? '', 'ret', col++, '', 'text-left'));
-
-  cells.push(
+  const cells = [
+    numInput(row.challan?.s_no ?? rowIndex + 1, 'challan', 0),
+    dateInput(row.challan?.challan_date ?? '', 'challan', 1),
+    textInput(row.challan?.challan_no ?? '', 'challan', 2),
+    numInput(row.challan?.total_books ?? '', 'challan', 3),
+    dateInput(row.ret?.return_date ?? '', 'ret', 4, 'section-divider'),
+    textInput(row.ret?.challan_no ?? '', 'ret', 5),
+    numInput(row.ret?.books_qty ?? '', 'ret', 6),
+    textInput(row.ret?.remark ?? '', 'ret', 7, '', 'text-left'),
     <td key="delete" className="delete-col">
       <button type="button" className="delete-row-btn" title="Delete row" onClick={onDelete}>✕</button>
-    </td>
-  );
+    </td>,
+  ];
 
   return <tr>{cells}</tr>;
 }

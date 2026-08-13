@@ -15,6 +15,7 @@ export default function NewAgentDialog({ open, onClose, onCreate }) {
     const form = e.target;
     onCreate({
       name: form.name.value.trim(),
+      state: form.state.value,
       region_name: form.region_name.value.trim(),
       area_code: form.area_code.value.trim().toUpperCase(),
     });
@@ -28,6 +29,13 @@ export default function NewAgentDialog({ open, onClose, onCreate }) {
         <label>
           Agent Name
           <input name="name" required />
+        </label>
+        <label>
+          State
+          <select name="state" defaultValue="MP">
+            <option value="MP">MP (Madhya Pradesh)</option>
+            <option value="CG">CG (Chhattisgarh)</option>
+          </select>
         </label>
         <label>
           Region

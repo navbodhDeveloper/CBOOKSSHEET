@@ -3,6 +3,8 @@ import { api, API_BASE } from './api';
 
 export default function OrderDetailModule({ setStatus }) {
   const [agents, setAgents] = useState([]);
+  const [states, setStates] = useState(['MP', 'CG']);
+  const [selectedState, setSelectedState] = useState('MP');
   const [agentSearch, setAgentSearch] = useState('');
   const [cycleStartYear, setCycleStartYear] = useState(new Date().getFullYear());
   const [selectedAgentId, setSelectedAgentId] = useState(null);
@@ -12,7 +14,9 @@ export default function OrderDetailModule({ setStatus }) {
   const [loaded, setLoaded] = useState(false);
 
   const loadAgents = useCallback(async () => {
-    setAgents(await api('/agents'));
+    const [ag, st] = await Promise.all([api('/agents'), api('/states')]);
+    setAgents(ag);
+    setStates(st.length ? st : ['MP', 'CG']);
   }, []);
 
   useEffect(() => { loadAgents().catch(err => setStatus(err.message, true)); }, [loadAgents, setStatus]);
@@ -21,8 +25,10 @@ export default function OrderDetailModule({ setStatus }) {
   const currentYear = new Date().getFullYear();
   for (let y = currentYear - 3; y <= currentYear + 1; y++) cycleOptions.push(y);
 
+  const agentsInState = agents.filter(a => (a.state || 'MP') === selectedState);
+
   function resolveAgentId() {
-    const match = agents.find(a => `${a.name} (${a.area_label})` === agentSearch);
+    const match = agentsInState.find(a => `${a.name} (${a.area_label})` === agentSearch);
     return match ? match.id : null;
   }
 
@@ -65,7 +71,11 @@ export default function OrderDetailModule({ setStatus }) {
   async function saveRow(row, idx) {
     const years = {};
     for (const y of row.years) {
-      years[y.year] = y;
+      years[y.year] = {
+        ...y,
+        balance: (Number(y.given) || 0) - (Number(y.returned) || 0),
+        balance_amt: (Number(y.order_amt) || 0) - (Number(y.order_ret_amt) || 0),
+      };
     }
     const payload = {
       agent_id: selectedAgentId, cycle_start_year: selectedCycle,
@@ -150,6 +160,16 @@ export default function OrderDetailModule({ setStatus }) {
 
       <section className="controls">
         <div className="field">
+          <label htmlFor="odStateSelect">State</label>
+          <select
+            id="odStateSelect"
+            value={selectedState}
+            onChange={(e) => { setSelectedState(e.target.value); setAgentSearch(''); }}
+          >
+            {states.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
+        <div className="field">
           <label htmlFor="odAgentSearch">Agent Name &amp; Area</label>
           <input
             id="odAgentSearch"
@@ -160,7 +180,7 @@ export default function OrderDetailModule({ setStatus }) {
             onChange={(e) => setAgentSearch(e.target.value)}
           />
           <datalist id="odAgentList">
-            {agents.map(a => <option key={a.id} value={`${a.name} (${a.area_label})`} />)}
+            {agentsInState.map(a => <option key={a.id} value={`${a.name} (${a.area_label})`} />)}
           </datalist>
         </div>
         <div className="field">
@@ -271,10 +291,10 @@ function OrderRow({ row, idx, years, updateRowField, updateYearField, toggleYear
           </td>
           <td>{numField(y, 'given')}</td>
           <td>{numField(y, 'returned')}</td>
-          <td>{numField(y, 'balance')}</td>
+          <td><span className="computed-cell">{(Number(yearVal(y, 'given')) || 0) - (Number(yearVal(y, 'returned')) || 0)}</span></td>
           <td>{numField(y, 'order_amt')}</td>
           <td>{numField(y, 'order_ret_amt')}</td>
-          <td>{numField(y, 'balance_amt')}</td>
+          <td><span className="computed-cell">{(Number(yearVal(y, 'order_amt')) || 0) - (Number(yearVal(y, 'order_ret_amt')) || 0)}</span></td>
           <td>
             <input type="checkbox" checked={!!row.years.find(yy => yy.year === y)?.defaulter}
               onChange={(e) => toggleYearFlag(idx, y, 'defaulter', e.target.checked)} />
@@ -379,7 +399,7 @@ function SummaryTables({ summary, years }) {
       </table>
       <p className="summary-note">
         "New" is auto-detected: a school counts as new in a year if it has an order amount that year but none in a prior year within this loaded cycle.
-        Defaulter/Order-Cut counts come from the checkboxes in each row's year block.
+        Defaulter/Order-Cut counts come from the flags you set per row per year — check the row's year cell (via the row's edit controls) to mark them.
       </p>
     </div>
   );

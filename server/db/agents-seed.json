@@ -1,0 +1,938 @@
+[
+  {
+    "state": "MP",
+    "area_label": "Bhopal - A",
+    "area_code": "M1",
+    "agent_name": "Ankit Kumar Jain"
+  },
+  {
+    "state": "MP",
+    "area_label": "Bhopal - B",
+    "area_code": "M2",
+    "agent_name": "Jitendra Sahu"
+  },
+  {
+    "state": "MP",
+    "area_label": "Bhopal - C",
+    "area_code": "M3",
+    "agent_name": "Skandraj Nema"
+  },
+  {
+    "state": "MP",
+    "area_label": "Raisen - A",
+    "area_code": "M4",
+    "agent_name": "Umesh Jaiswal"
+  },
+  {
+    "state": "MP",
+    "area_label": "Raisen - B",
+    "area_code": "M5",
+    "agent_name": "Krishna Bharadwaj"
+  },
+  {
+    "state": "MP",
+    "area_label": "Sehore - A",
+    "area_code": "M6",
+    "agent_name": "Amit Puri Goswami"
+  },
+  {
+    "state": "MP",
+    "area_label": "Sehore - B",
+    "area_code": "M7",
+    "agent_name": "Abhishek Gautam"
+  },
+  {
+    "state": "MP",
+    "area_label": "Vidisha - A",
+    "area_code": "M8",
+    "agent_name": "Rohit Soni"
+  },
+  {
+    "state": "MP",
+    "area_label": "Vidisha - B",
+    "area_code": "M9",
+    "agent_name": "Naveen Khare"
+  },
+  {
+    "state": "MP",
+    "area_label": "Rajgarh - A",
+    "area_code": "M10",
+    "agent_name": "Brijmohan Lovewanshi"
+  },
+  {
+    "state": "MP",
+    "area_label": "Hoshangabad - A",
+    "area_code": "M11",
+    "agent_name": "Satish Kahar"
+  },
+  {
+    "state": "MP",
+    "area_label": "Itarsi - B",
+    "area_code": "M12",
+    "agent_name": "Budhram Dehariya"
+  },
+  {
+    "state": "MP",
+    "area_label": "Betul - A",
+    "area_code": "M13",
+    "agent_name": "Sunil Chandrawanshi"
+  },
+  {
+    "state": "MP",
+    "area_label": "Betul - B",
+    "area_code": "M14",
+    "agent_name": "Dinesh Rahangadale"
+  },
+  {
+    "state": "MP",
+    "area_label": "Harda",
+    "area_code": "M15",
+    "agent_name": "Sunil Kadwey"
+  },
+  {
+    "state": "MP",
+    "area_label": "Gawalior - A",
+    "area_code": "M16",
+    "agent_name": "Vishnu Goswami"
+  },
+  {
+    "state": "MP",
+    "area_label": "Dabra - B",
+    "area_code": "M17",
+    "agent_name": "Rajesh Temre"
+  },
+  {
+    "state": "MP",
+    "area_label": "Datia",
+    "area_code": "M18",
+    "agent_name": "Brijmohan Lovewanshi"
+  },
+  {
+    "state": "MP",
+    "area_label": "Shivpuri - A",
+    "area_code": "M19",
+    "agent_name": "Subhash Goswami"
+  },
+  {
+    "state": "MP",
+    "area_label": "Shivpuri - B",
+    "area_code": "M20",
+    "agent_name": "Rajesh Sharma"
+  },
+  {
+    "state": "MP",
+    "area_label": "Guna",
+    "area_code": "M21",
+    "agent_name": "Satyanarayan Lodhi"
+  },
+  {
+    "state": "MP",
+    "area_label": "Ashoknagar",
+    "area_code": "M22",
+    "agent_name": "Sagar Srivastava"
+  },
+  {
+    "state": "MP",
+    "area_label": "Rajgarh - B",
+    "area_code": "M23",
+    "agent_name": "Bhagwan Singh Umath"
+  },
+  {
+    "state": "MP",
+    "area_label": "Bhind - B",
+    "area_code": "M24",
+    "agent_name": "Jagdish Kushwaha"
+  },
+  {
+    "state": "MP",
+    "area_label": "Muraina - A",
+    "area_code": "M25",
+    "agent_name": "Shrawan Kumar Dwivedi"
+  },
+  {
+    "state": "MP",
+    "area_label": "Muraina - B",
+    "area_code": "M26",
+    "agent_name": "Yogesh Patle"
+  },
+  {
+    "state": "MP",
+    "area_label": "Sheopur",
+    "area_code": "M27",
+    "agent_name": "Om Prakash Ade"
+  },
+  {
+    "state": "MP",
+    "area_label": "Indore - A",
+    "area_code": "M28",
+    "agent_name": "Chetan Singh Rajput"
+  },
+  {
+    "state": "MP",
+    "area_label": "Indore - B",
+    "area_code": "M29",
+    "agent_name": "Kamal Chaudhary"
+  },
+  {
+    "state": "MP",
+    "area_label": "Indore - C",
+    "area_code": "M30",
+    "agent_name": "Yogendra Mishra"
+  },
+  {
+    "state": "MP",
+    "area_label": "Khandwa",
+    "area_code": "M31",
+    "agent_name": "Ratnesh Pandey"
+  },
+  {
+    "state": "MP",
+    "area_label": "Barwani",
+    "area_code": "M32",
+    "agent_name": "Shubham Shukla"
+  },
+  {
+    "state": "MP",
+    "area_label": "Khargone A",
+    "area_code": "M33",
+    "agent_name": "Mrityunjai Singh"
+  },
+  {
+    "state": "MP",
+    "area_label": "Khargone B",
+    "area_code": "M34",
+    "agent_name": "Ghanshyam Das Tiwari"
+  },
+  {
+    "state": "MP",
+    "area_label": "Dhar - A",
+    "area_code": "M35",
+    "agent_name": "Vinay Malviya"
+  },
+  {
+    "state": "MP",
+    "area_label": "Dhar - B",
+    "area_code": "M36",
+    "agent_name": "Praveen Jaiswal"
+  },
+  {
+    "state": "MP",
+    "area_label": "Burhanpur",
+    "area_code": "M37",
+    "agent_name": "Mayank Yadav"
+  },
+  {
+    "state": "MP",
+    "area_label": "Jhabua",
+    "area_code": "M38",
+    "agent_name": "Mahesh Parte"
+  },
+  {
+    "state": "MP",
+    "area_label": "Ratlam - A",
+    "area_code": "M39",
+    "agent_name": "Narendra Dhakad"
+  },
+  {
+    "state": "MP",
+    "area_label": "Mandsaur - A",
+    "area_code": "M40",
+    "agent_name": "Durga Shankar Malviya"
+  },
+  {
+    "state": "MP",
+    "area_label": "Neemuch - A",
+    "area_code": "M41",
+    "agent_name": "Narendra Puri Goswami"
+  },
+  {
+    "state": "MP",
+    "area_label": "Shajapur - A",
+    "area_code": "M42",
+    "agent_name": "Hiralal Baghel"
+  },
+  {
+    "state": "MP",
+    "area_label": "Dewas - A",
+    "area_code": "M43",
+    "agent_name": "Deepak Goud"
+  },
+  {
+    "state": "MP",
+    "area_label": "Dewas - B",
+    "area_code": "M44",
+    "agent_name": "Jitendra Jatt"
+  },
+  {
+    "state": "MP",
+    "area_label": "Ujjain - A",
+    "area_code": "M45",
+    "agent_name": "Omkar Dangi"
+  },
+  {
+    "state": "MP",
+    "area_label": "Ujjain - B",
+    "area_code": "M46",
+    "agent_name": "Rajesh Lovewanshi"
+  },
+  {
+    "state": "MP",
+    "area_label": "Jabalpur - A",
+    "area_code": "M47",
+    "agent_name": "Sanjay Gautam"
+  },
+  {
+    "state": "MP",
+    "area_label": "Jabalpur - B",
+    "area_code": "M48",
+    "agent_name": "Saurabh Singh"
+  },
+  {
+    "state": "MP",
+    "area_label": "Jabalpur - C",
+    "area_code": "M49",
+    "agent_name": "Dilip Chakravarty"
+  },
+  {
+    "state": "MP",
+    "area_label": "Katni - A",
+    "area_code": "M50",
+    "agent_name": "Nilesh Tiwari"
+  },
+  {
+    "state": "MP",
+    "area_label": "Katni - B",
+    "area_code": "M51",
+    "agent_name": "Yogendra Mishra"
+  },
+  {
+    "state": "MP",
+    "area_label": "Mandala - A",
+    "area_code": "M53",
+    "agent_name": "Khuman Singh Rahangdale"
+  },
+  {
+    "state": "MP",
+    "area_label": "Seoni - A",
+    "area_code": "M54",
+    "agent_name": "Abhishek Puri Goswami"
+  },
+  {
+    "state": "MP",
+    "area_label": "Balaghat - A",
+    "area_code": "M55",
+    "agent_name": "Ravindra Rahangdale"
+  },
+  {
+    "state": "MP",
+    "area_label": "Balaghat - B",
+    "area_code": "M56",
+    "agent_name": "Rameshwar Rana"
+  },
+  {
+    "state": "MP",
+    "area_label": "Chhindwara - A",
+    "area_code": "M57",
+    "agent_name": "Vishnu Dwivedi"
+  },
+  {
+    "state": "MP",
+    "area_label": "Damoh - A",
+    "area_code": "M58",
+    "agent_name": "Brijesh Kumar Tiwari"
+  },
+  {
+    "state": "MP",
+    "area_label": "Chhindwara - C",
+    "area_code": "M59",
+    "agent_name": "Lekhraj Hurmade"
+  },
+  {
+    "state": "MP",
+    "area_label": "Sagar - A",
+    "area_code": "M60",
+    "agent_name": "Imran Khan"
+  },
+  {
+    "state": "MP",
+    "area_label": "Beena - B",
+    "area_code": "M61",
+    "agent_name": "Aman Soni"
+  },
+  {
+    "state": "MP",
+    "area_label": "Chhindwara - B",
+    "area_code": "M62",
+    "agent_name": "Devesh Chandrawanshi"
+  },
+  {
+    "state": "MP",
+    "area_label": "Panna",
+    "area_code": "M63",
+    "agent_name": "Animesh Gautam"
+  },
+  {
+    "state": "MP",
+    "area_label": "Chhatarpur - A",
+    "area_code": "M64",
+    "agent_name": "Ashish Chaurasiya"
+  },
+  {
+    "state": "MP",
+    "area_label": "Tikamgarh",
+    "area_code": "M65",
+    "agent_name": "Kamlesh Chaudhary"
+  },
+  {
+    "state": "MP",
+    "area_label": "Rewa - A",
+    "area_code": "M66",
+    "agent_name": "Dharmendra Choubey"
+  },
+  {
+    "state": "MP",
+    "area_label": "Rewa - B",
+    "area_code": "M67",
+    "agent_name": "Shivmohan Sharma"
+  },
+  {
+    "state": "MP",
+    "area_label": "Satna - A",
+    "area_code": "M68",
+    "agent_name": "Ganesh Kumar Tiwari"
+  },
+  {
+    "state": "MP",
+    "area_label": "Satna - B",
+    "area_code": "M69",
+    "agent_name": "Saurabh Dubey"
+  },
+  {
+    "state": "MP",
+    "area_label": "Satna - C",
+    "area_code": "M70",
+    "agent_name": "Rahul Pathak"
+  },
+  {
+    "state": "MP",
+    "area_label": "Sidhi - I",
+    "area_code": "M71",
+    "agent_name": "Rajkumar Rahangdale"
+  },
+  {
+    "state": "MP",
+    "area_label": "Singrauli",
+    "area_code": "M72",
+    "agent_name": "Hemant Kushwaha"
+  },
+  {
+    "state": "MP",
+    "area_label": "Shahdol - A",
+    "area_code": "M73",
+    "agent_name": "Prince Agrawal"
+  },
+  {
+    "state": "MP",
+    "area_label": "Shahdol - B",
+    "area_code": "M74",
+    "agent_name": "Ravindra Gajhbhiye"
+  },
+  {
+    "state": "MP",
+    "area_label": "Anuppur",
+    "area_code": "M75",
+    "agent_name": "Pradeep Kori"
+  },
+  {
+    "state": "MP",
+    "area_label": "Dindori",
+    "area_code": "M76",
+    "agent_name": "Manish Bairagi"
+  },
+  {
+    "state": "MP",
+    "area_label": "Umariya",
+    "area_code": "M77",
+    "agent_name": "Raju Sahu"
+  },
+  {
+    "state": "MP",
+    "area_label": "Narsinghpur - A",
+    "area_code": "M78",
+    "agent_name": "Shashimohan Mishra"
+  },
+  {
+    "state": "MP",
+    "area_label": "Narsinghpur - B",
+    "area_code": "M79",
+    "agent_name": "Shirish Tiwari"
+  },
+  {
+    "state": "MP",
+    "area_label": "Jabalpur - D",
+    "area_code": "M80",
+    "agent_name": "Pranav Bhargava"
+  },
+  {
+    "state": "MP",
+    "area_label": "Bhind - A",
+    "area_code": "M81",
+    "agent_name": "Narayan Sirodiya"
+  },
+  {
+    "state": "MP",
+    "area_label": "Mandsaur - B",
+    "area_code": "M83",
+    "agent_name": "Mohit Goswami"
+  },
+  {
+    "state": "MP",
+    "area_label": "Chhatarpur - B",
+    "area_code": "M84",
+    "agent_name": "Arvind Shukla"
+  },
+  {
+    "state": "MP",
+    "area_label": "Ratlam - B",
+    "area_code": "M85",
+    "agent_name": "Arjun Dhangar"
+  },
+  {
+    "state": "MP",
+    "area_label": "Neemuch - B",
+    "area_code": "M86",
+    "agent_name": "Narendra Puri Goswami"
+  },
+  {
+    "state": "MP",
+    "area_label": "Alirajpur",
+    "area_code": "M87",
+    "agent_name": "Anil Dangode"
+  },
+  {
+    "state": "MP",
+    "area_label": "Gwalior - B",
+    "area_code": "M89",
+    "agent_name": "Nasir Khan"
+  },
+  {
+    "state": "MP",
+    "area_label": "Ujjain - C",
+    "area_code": "M93",
+    "agent_name": "Rajat Meena"
+  },
+  {
+    "state": "MP",
+    "area_label": "Seoni - B",
+    "area_code": "M94",
+    "agent_name": "Sohit Tiwari"
+  },
+  {
+    "state": "MP",
+    "area_label": "Damoh - B",
+    "area_code": "M95",
+    "agent_name": "Govind Bhajaiya"
+  },
+  {
+    "state": "MP",
+    "area_label": "Agar",
+    "area_code": "M96",
+    "agent_name": "Anil Yadav"
+  },
+  {
+    "state": "MP",
+    "area_label": "Shajapur - B",
+    "area_code": "M97",
+    "agent_name": "Mahendra Kawadkar"
+  },
+  {
+    "state": "MP",
+    "area_label": "Mandala - B",
+    "area_code": "M98",
+    "agent_name": "Shiv Kumar Kushwaha"
+  },
+  {
+    "state": "MP",
+    "area_label": "Indore - D",
+    "area_code": "M99",
+    "agent_name": "Jitendra Sharma"
+  },
+  {
+    "state": "MP",
+    "area_label": "Balaghat - C",
+    "area_code": "M100",
+    "agent_name": "Prahlad Panariya"
+  },
+  {
+    "state": "MP",
+    "area_label": "Sidhi Ii",
+    "area_code": "M109",
+    "agent_name": "Saurabh Khare"
+  },
+  {
+    "state": "MP",
+    "area_label": "Rewa - C",
+    "area_code": "M110",
+    "agent_name": "Tanuj Mishra"
+  },
+  {
+    "state": "MP",
+    "area_label": "Sagar - B",
+    "area_code": "M112",
+    "agent_name": "Sameer Dwivedi"
+  },
+  {
+    "state": "CG",
+    "area_label": "Raipur Local I",
+    "area_code": "C1",
+    "agent_name": "Durga Tiwari"
+  },
+  {
+    "state": "CG",
+    "area_label": "Raipur Local Ii",
+    "area_code": "C2",
+    "agent_name": "B.l. Chaturvedi"
+  },
+  {
+    "state": "CG",
+    "area_label": "Bhilai I",
+    "area_code": "C3",
+    "agent_name": "Rakesh Dhurandhar"
+  },
+  {
+    "state": "CG",
+    "area_label": "Durg Local",
+    "area_code": "C4",
+    "agent_name": "Dilip Sahu"
+  },
+  {
+    "state": "CG",
+    "area_label": "Surgi Anjora",
+    "area_code": "C5",
+    "agent_name": "Janev Prasad Suryawanshi"
+  },
+  {
+    "state": "CG",
+    "area_label": "Rajnandgaon Local",
+    "area_code": "C7",
+    "agent_name": "Narayan Patil"
+  },
+  {
+    "state": "CG",
+    "area_label": "Rajnandaon Gramin",
+    "area_code": "C8",
+    "agent_name": "Dinesh Deshmukh"
+  },
+  {
+    "state": "CG",
+    "area_label": "Dongargarh",
+    "area_code": "C9",
+    "agent_name": "Hemdas Manikpuri"
+  },
+  {
+    "state": "CG",
+    "area_label": "Khairagarh",
+    "area_code": "C10",
+    "agent_name": "Hemdas Manikpuri"
+  },
+  {
+    "state": "CG",
+    "area_label": "Kawardha",
+    "area_code": "C11",
+    "agent_name": "Rakesh Sahu"
+  },
+  {
+    "state": "CG",
+    "area_label": "Bemetara I",
+    "area_code": "C12",
+    "agent_name": "Kailash Dewangan"
+  },
+  {
+    "state": "CG",
+    "area_label": "Gandai",
+    "area_code": "C13",
+    "agent_name": "Mahesh Sahu"
+  },
+  {
+    "state": "CG",
+    "area_label": "Patan Gunderdehi",
+    "area_code": "C14",
+    "agent_name": "Omprakash Sahu"
+  },
+  {
+    "state": "CG",
+    "area_label": "Balod",
+    "area_code": "C15",
+    "agent_name": "Bhanuram Patel"
+  },
+  {
+    "state": "CG",
+    "area_label": "Dhamtari",
+    "area_code": "C16",
+    "agent_name": "Kanhaiya Aghariya"
+  },
+  {
+    "state": "CG",
+    "area_label": "Kurud",
+    "area_code": "C17",
+    "agent_name": "Kamesh Singh"
+  },
+  {
+    "state": "CG",
+    "area_label": "Kanker",
+    "area_code": "C18",
+    "agent_name": "Rajesh Mandal"
+  },
+  {
+    "state": "CG",
+    "area_label": "Kondagaon",
+    "area_code": "C19",
+    "agent_name": "Dinesh Sahu"
+  },
+  {
+    "state": "CG",
+    "area_label": "Jagdalpur",
+    "area_code": "C20",
+    "agent_name": "Rohit Sahu"
+  },
+  {
+    "state": "CG",
+    "area_label": "Dantewada",
+    "area_code": "C21",
+    "agent_name": "Brijlal Vaishnav"
+  },
+  {
+    "state": "CG",
+    "area_label": "Bilaspur I",
+    "area_code": "C22",
+    "agent_name": "Ashok Kumar Dewangan"
+  },
+  {
+    "state": "CG",
+    "area_label": "Bilaspur Ii",
+    "area_code": "C23",
+    "agent_name": "Anekdas Manikpuri"
+  },
+  {
+    "state": "CG",
+    "area_label": "Panthi",
+    "area_code": "C24",
+    "agent_name": "Mukesh Bhosle"
+  },
+  {
+    "state": "CG",
+    "area_label": "Pendra Road",
+    "area_code": "C25",
+    "agent_name": "Virendra Rajput"
+  },
+  {
+    "state": "CG",
+    "area_label": "Mungeli",
+    "area_code": "C26",
+    "agent_name": "Anil Ramteke"
+  },
+  {
+    "state": "CG",
+    "area_label": "Lormi Pandariya",
+    "area_code": "C27",
+    "agent_name": "Tikaram Laser"
+  },
+  {
+    "state": "CG",
+    "area_label": "Jashpur",
+    "area_code": "C28",
+    "agent_name": "Anil Wamankar"
+  },
+  {
+    "state": "CG",
+    "area_label": "Pathalgaon",
+    "area_code": "C29",
+    "agent_name": "Cholaram Sahu"
+  },
+  {
+    "state": "CG",
+    "area_label": "Manedragarh",
+    "area_code": "C31",
+    "agent_name": "Rajneet Patle"
+  },
+  {
+    "state": "CG",
+    "area_label": "Baikunthpur",
+    "area_code": "C32",
+    "agent_name": "Shobhit Agrawal"
+  },
+  {
+    "state": "CG",
+    "area_label": "Shakti I",
+    "area_code": "C33",
+    "agent_name": "Hemant Kshatri"
+  },
+  {
+    "state": "CG",
+    "area_label": "Akaltara",
+    "area_code": "C34",
+    "agent_name": "Neeraj Sinha"
+  },
+  {
+    "state": "CG",
+    "area_label": "Raigarh",
+    "area_code": "C35",
+    "agent_name": "Faggu Patel"
+  },
+  {
+    "state": "CG",
+    "area_label": "Sarangarh",
+    "area_code": "C36",
+    "agent_name": "Kaushik Vishal"
+  },
+  {
+    "state": "CG",
+    "area_label": "Mahasamund",
+    "area_code": "C37",
+    "agent_name": "Sunil Sahu"
+  },
+  {
+    "state": "CG",
+    "area_label": "Pithora",
+    "area_code": "C38",
+    "agent_name": "Gopal Prasad Soni"
+  },
+  {
+    "state": "CG",
+    "area_label": "Saraipali",
+    "area_code": "C39",
+    "agent_name": "Naresh Nayak"
+  },
+  {
+    "state": "CG",
+    "area_label": "Korba Local",
+    "area_code": "C40",
+    "agent_name": "Chandrakant Pandey"
+  },
+  {
+    "state": "CG",
+    "area_label": "Korba Gramin Kartala",
+    "area_code": "C41",
+    "agent_name": "Arvind Sahu"
+  },
+  {
+    "state": "CG",
+    "area_label": "Katghora",
+    "area_code": "C42",
+    "agent_name": "Karan Rathore"
+  },
+  {
+    "state": "CG",
+    "area_label": "Balodabazar",
+    "area_code": "C43",
+    "agent_name": "Neman Sahu"
+  },
+  {
+    "state": "CG",
+    "area_label": "Lavan Kasdol (shivrinarayan)",
+    "area_code": "C44",
+    "agent_name": "Kishan Lal Kanwar"
+  },
+  {
+    "state": "CG",
+    "area_label": "Wadrafnagar Ramanujganj",
+    "area_code": "C46",
+    "agent_name": "Dhirendra Pratap Singh"
+  },
+  {
+    "state": "CG",
+    "area_label": "Ambikapur Local",
+    "area_code": "C47",
+    "agent_name": "Shyam Kumar Dewangan"
+  },
+  {
+    "state": "CG",
+    "area_label": "Surajpur I",
+    "area_code": "C48",
+    "agent_name": "Ravi Kumar Khiyani"
+  },
+  {
+    "state": "CG",
+    "area_label": "Janjgir Champa I",
+    "area_code": "C49",
+    "agent_name": "Dileswar Sahu"
+  },
+  {
+    "state": "CG",
+    "area_label": "Mandhar Siliari",
+    "area_code": "C54",
+    "agent_name": "Vinod Kumar Chaturvedi"
+  },
+  {
+    "state": "CG",
+    "area_label": "Tilda Bhatapara",
+    "area_code": "C55",
+    "agent_name": "Manharan Sinha"
+  },
+  {
+    "state": "CG",
+    "area_label": "Surajpur Ii",
+    "area_code": "C56",
+    "agent_name": "Jitendra Kumar Kashyap"
+  },
+  {
+    "state": "CG",
+    "area_label": "Abhanpur",
+    "area_code": "C57",
+    "agent_name": "Lokesh Deshmukh"
+  },
+  {
+    "state": "CG",
+    "area_label": "Bhanuparatpur",
+    "area_code": "C58",
+    "agent_name": "Yuvraj Singh"
+  },
+  {
+    "state": "CG",
+    "area_label": "Gariyaband",
+    "area_code": "C59",
+    "agent_name": "Kishor Surjal"
+  },
+  {
+    "state": "CG",
+    "area_label": "Kharsiya",
+    "area_code": "C60",
+    "agent_name": "Vinod Sahu"
+  },
+  {
+    "state": "CG",
+    "area_label": "Bhilai Ii",
+    "area_code": "C63",
+    "agent_name": "Vinod Kumar Sahu"
+  },
+  {
+    "state": "CG",
+    "area_label": "Ambikapur Gramin",
+    "area_code": "C91",
+    "agent_name": "Bhakt Prahlad"
+  },
+  {
+    "state": "CG",
+    "area_label": "Sukma",
+    "area_code": "C93",
+    "agent_name": "Abhishek Katendra"
+  },
+  {
+    "state": "CG",
+    "area_label": "Bijapur",
+    "area_code": "C95",
+    "agent_name": "Naresh Kumar Sahu"
+  },
+  {
+    "state": "CG",
+    "area_label": "Narayanpur (kondagaon)",
+    "area_code": "C97",
+    "agent_name": "Ageshwar Sahu"
+  },
+  {
+    "state": "CG",
+    "area_label": "Keshkal",
+    "area_code": "C99",
+    "agent_name": "Dinesh Sahu"
+  }
+]

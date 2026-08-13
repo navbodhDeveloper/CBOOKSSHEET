@@ -11,13 +11,6 @@ router.get('/challan-issue', async (req, res) => {
   if (!agent) return res.status(404).json({ error: 'agent not found' });
   const area = db.data.areas.find(a => a.id === agent.area_id);
 
-  const bookTypes = [...db.data.book_types].sort((a, b) => a.sort_order - b.sort_order);
-  const navbodh = bookTypes.filter(b => b.category === 'नवबोध सेट');
-  const gyanbodh = bookTypes.filter(b => b.category === 'ज्ञानबोध सेट');
-  const special = bookTypes.find(b => b.code === 'SPECIAL_SET');
-  const loose = bookTypes.find(b => b.code === 'LOOSE_BOOK');
-  const orderedTypes = [...navbodh, ...gyanbodh];
-
   const challans = db.data.challans
     .filter(c => String(c.agent_id) === String(agent_id) && String(c.year) === String(year))
     .sort((a, b) => (a.challan_date || '').localeCompare(b.challan_date || '') || (a.s_no || 0) - (b.s_no || 0));
@@ -30,14 +23,12 @@ router.get('/challan-issue', async (req, res) => {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('C.Book Challan Issue Details');
 
-  const firstTypeCol = 4;
-  const specialCol = firstTypeCol + orderedTypes.length;
-  const looseCol = specialCol + 1;
-  const totalBooksCol = looseCol + 1;
-  const returnDateCol = totalBooksCol + 1;
-  const returnChallanCol = returnDateCol + 1;
-  const returnQtyCol = returnChallanCol + 1;
-  const remarkCol = returnQtyCol + 1;
+  // Columns: S.N.(1) Date(2) Challan No.(3) Total Books(4) | Return Date(5) Return Challan No.(6) Return Qty(7) Remark(8)
+  const totalBooksCol = 4;
+  const returnDateCol = 5;
+  const returnChallanCol = 6;
+  const returnQtyCol = 7;
+  const remarkCol = 8;
   const lastCol = remarkCol;
 
   const colLetter = (n) => sheet.getColumn(n).letter;
@@ -63,50 +54,20 @@ router.get('/challan-issue', async (req, res) => {
   sheet.getCell(3, returnDateCol).alignment = { horizontal: 'center' };
 
   const headerRow = 4;
-  const setNameRow = 5;
-  const setSizeRow = 6;
-
-  const singleColHeaders = [
-    [1, 'S.N.'], [2, 'Date'], [3, 'Challan No.'],
-    [specialCol, 'Special Set'], [looseCol, 'Loose Book'], [totalBooksCol, 'किताबों की संख्या'],
+  const headers = [
+    [1, 'S.N.'], [2, 'Date'], [3, 'Challan No.'], [totalBooksCol, 'किताबों की संख्या'],
     [returnDateCol, 'दिनांक'], [returnChallanCol, 'चालान क्रमांक'],
     [returnQtyCol, 'किताबों की संख्या'], [remarkCol, 'रिमार्क'],
   ];
-  for (const [col, label] of singleColHeaders) {
-    sheet.mergeCells(headerRow, col, setNameRow + 1, col);
+  for (const [col, label] of headers) {
     const c = sheet.getCell(headerRow, col);
     c.value = label;
     c.font = { bold: true };
     c.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
   }
+  sheet.getRow(headerRow).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } };
 
-  if (navbodh.length) {
-    sheet.mergeCells(headerRow, firstTypeCol, headerRow, firstTypeCol + navbodh.length - 1);
-    sheet.getCell(headerRow, firstTypeCol).value = 'नवबोध सेट';
-    sheet.getCell(headerRow, firstTypeCol).font = { bold: true };
-    sheet.getCell(headerRow, firstTypeCol).alignment = { horizontal: 'center' };
-  }
-  if (gyanbodh.length) {
-    const gStart = firstTypeCol + navbodh.length;
-    sheet.mergeCells(headerRow, gStart, headerRow, gStart + gyanbodh.length - 1);
-    sheet.getCell(headerRow, gStart).value = 'ज्ञानबोध सेट';
-    sheet.getCell(headerRow, gStart).font = { bold: true };
-    sheet.getCell(headerRow, gStart).alignment = { horizontal: 'center' };
-  }
-
-  orderedTypes.forEach((bt, idx) => {
-    const col = firstTypeCol + idx;
-    const nameCell = sheet.getCell(setNameRow, col);
-    nameCell.value = bt.name_english;
-    nameCell.font = { bold: true };
-    nameCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-
-    const sizeCell = sheet.getCell(setSizeRow, col);
-    sizeCell.value = bt.set_size ? `${bt.set_size}\nBooks` : '';
-    sizeCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-  });
-
-  let r = headerRow + 3;
+  let r = headerRow + 1;
   for (let i = 0; i < rowCount; i++) {
     const c = challans[i];
     const ret = returns[i];
@@ -115,17 +76,6 @@ router.get('/challan-issue', async (req, res) => {
       sheet.getCell(r, 1).value = c.s_no ?? i + 1;
       sheet.getCell(r, 2).value = c.challan_date;
       sheet.getCell(r, 3).value = c.challan_no;
-      const map = {};
-      for (const it of (c.items || [])) {
-        const bt = bookTypes.find(b => b.id === it.book_type_id);
-        if (bt) map[bt.code] = it.quantity;
-      }
-      orderedTypes.forEach((bt, idx) => {
-        const q = map[bt.code];
-        if (q) sheet.getCell(r, firstTypeCol + idx).value = q;
-      });
-      if (special && map[special.code]) sheet.getCell(r, specialCol).value = map[special.code];
-      if (loose && map[loose.code]) sheet.getCell(r, looseCol).value = map[loose.code];
       sheet.getCell(r, totalBooksCol).value = c.total_books || '';
     }
 
@@ -138,38 +88,34 @@ router.get('/challan-issue', async (req, res) => {
     r++;
   }
 
+  const firstDataRow = headerRow + 1;
+  const lastDataRow = r - 1;
+
   sheet.getCell(r, 3).value = 'TOTAL:-';
   sheet.getCell(r, 3).font = { bold: true };
-  orderedTypes.forEach((bt, idx) => {
-    const col = firstTypeCol + idx;
-    const letter = colLetter(col);
-    sheet.getCell(r, col).value = { formula: `SUM(${letter}${headerRow + 3}:${letter}${r - 1})` };
-    sheet.getCell(r, col).font = { bold: true };
-  });
-  if (special) {
-    const letter = colLetter(specialCol);
-    sheet.getCell(r, specialCol).value = { formula: `SUM(${letter}${headerRow + 3}:${letter}${r - 1})` };
+  if (lastDataRow >= firstDataRow) {
+    const totalLetter = colLetter(totalBooksCol);
+    sheet.getCell(r, totalBooksCol).value = { formula: `SUM(${totalLetter}${firstDataRow}:${totalLetter}${lastDataRow})` };
   }
-  if (loose) {
-    const letter = colLetter(looseCol);
-    sheet.getCell(r, looseCol).value = { formula: `SUM(${letter}${headerRow + 3}:${letter}${r - 1})` };
-  }
-  {
-    const letter = colLetter(totalBooksCol);
-    sheet.getCell(r, totalBooksCol).value = { formula: `SUM(${letter}${headerRow + 3}:${letter}${r - 1})` };
-    sheet.getCell(r, totalBooksCol).font = { bold: true };
-  }
+  sheet.getCell(r, totalBooksCol).font = { bold: true };
+
   sheet.getCell(r, returnChallanCol).value = 'TOTAL:-';
   sheet.getCell(r, returnChallanCol).font = { bold: true };
-  {
-    const letter = colLetter(returnQtyCol);
-    sheet.getCell(r, returnQtyCol).value = { formula: `SUM(${letter}${headerRow + 3}:${letter}${r - 1})` };
-    sheet.getCell(r, returnQtyCol).font = { bold: true };
+  if (lastDataRow >= firstDataRow) {
+    const retLetter = colLetter(returnQtyCol);
+    sheet.getCell(r, returnQtyCol).value = { formula: `SUM(${retLetter}${firstDataRow}:${retLetter}${lastDataRow})` };
   }
+  sheet.getCell(r, returnQtyCol).font = { bold: true };
 
-  for (let col = 1; col <= lastCol; col++) {
-    sheet.getColumn(col).width = col <= 3 ? 12 : 10;
-  }
+  sheet.getColumn(1).width = 8;
+  sheet.getColumn(2).width = 14;
+  sheet.getColumn(3).width = 14;
+  sheet.getColumn(totalBooksCol).width = 14;
+  sheet.getColumn(returnDateCol).width = 14;
+  sheet.getColumn(returnChallanCol).width = 14;
+  sheet.getColumn(returnQtyCol).width = 14;
+  sheet.getColumn(remarkCol).width = 24;
+
   for (let row = 1; row <= r; row++) {
     for (let col = 1; col <= lastCol; col++) {
       sheet.getCell(row, col).border = {
@@ -178,7 +124,6 @@ router.get('/challan-issue', async (req, res) => {
       };
     }
   }
-  sheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } };
 
   const filename = `Challan_Issue_${agent.name.replace(/\s+/g, '_')}_${year}.xlsx`;
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -187,4 +132,4 @@ router.get('/challan-issue', async (req, res) => {
   res.end();
 });
 
-module.exports = router;
+module.exports = router;    

@@ -1,19 +1,36 @@
 const express = require('express');
 const router = express.Router();
+const ExcelJS = require('exceljs');
 const { db, nextId } = require('../db');
+
+// Same column order as the export template (server/routes/export-schools.js).
+// null = computed column (NET SPE / NET ORDER), skipped on import since it's derived.
+const IMPORT_COLUMNS = [
+  'school_code', 'school_name_address', 'principal_name_mobile', 'grade', 'medium', 'board',
+  'specimen_give_month', 'book_delivery_month',
+  'specimen_given_2021', 'specimen_given_2022', 'specimen_given_2023',
+  'specimen_returned_2021', 'specimen_returned_2022', 'specimen_returned_2023',
+  null, null, null, // 2021/2022/2023 NET SPE (computed)
+  'visit_1', 'visit_2', 'visit_3',
+  'order_2021', 'vapasi_2021', null, // 21 Net Order (computed)
+  'order_2022', 'vapasi_2022', null, // 22 Net Order (computed)
+  'order_2023', 'vapasi_2023', null, // 23 Net Order (computed)
+  'yog_amt', 'ayog_amt', 'total_amt', null, // R (computed)
+  'supplying_party', 'discussion_2023', 'discussion_2024', 'remark',
+];
 
 // All editable fields, in the exact original column order
 const FIELDS = [
+  'agent_id',
   'school_code', 'school_name_address', 'principal_name_mobile',
   'grade', 'medium', 'board',
   'specimen_give_month', 'book_delivery_month',
   'specimen_given_2021', 'specimen_given_2022', 'specimen_given_2023',
   'specimen_returned_2021', 'specimen_returned_2022', 'specimen_returned_2023',
-  'books_finalized_2021', 'books_finalized_2022', 'books_finalized_2023',
-  'gift_given',
   'visit_1', 'visit_2', 'visit_3',
-  'dist_2024_distributed', 'dist_2024_returned', 'dist_2024_net',
-  'supplying_party', 'discussion_2024', 'remark',
+  'order_2021', 'vapasi_2021', 'order_2022', 'vapasi_2022', 'order_2023', 'vapasi_2023',
+  'yog_amt', 'ayog_amt', 'total_amt',
+  'supplying_party', 'discussion_2023', 'discussion_2024', 'remark',
 ];
 
 function pickFields(body) {
@@ -24,11 +41,26 @@ function pickFields(body) {
   return out;
 }
 
-// GET /api/schools?list_type=MASTER&search=abc
+// Same School Code + School Name/Address already exists anywhere in this list
+// (Master/New/CBSE), regardless of which agent owns it.
+function findDuplicate(list_type, school_code, school_name_address, excludeId) {
+  const code = (school_code || '').trim().toLowerCase();
+  const name = (school_name_address || '').trim().toLowerCase();
+  if (!code && !name) return null;
+  return db.data.schools.find(s =>
+    s.id !== excludeId &&
+    s.list_type === list_type &&
+    (s.school_code || '').trim().toLowerCase() === code &&
+    (s.school_name_address || '').trim().toLowerCase() === name
+  );
+}
+
+// GET /api/schools?list_type=MASTER&search=abc&agent_id=1
 router.get('/', (req, res) => {
-  const { list_type, search } = req.query;
+  const { list_type, search, agent_id } = req.query;
   let rows = db.data.schools;
   if (list_type) rows = rows.filter(s => s.list_type === list_type);
+  if (agent_id) rows = rows.filter(s => String(s.agent_id) === String(agent_id));
   if (search) {
     const q = search.toLowerCase();
     rows = rows.filter(s =>
@@ -48,8 +80,11 @@ router.get('/:id', (req, res) => {
 
 // POST /api/schools  { list_type, ...fields }
 router.post('/', async (req, res) => {
-  const { list_type } = req.body;
+  const { list_type, school_code, school_name_address } = req.body;
   if (!list_type) return res.status(400).json({ error: 'list_type is required' });
+
+  const dup = findDuplicate(list_type, school_code, school_name_address, null);
+  if (dup) return res.status(409).json({ error: `Duplicate: a school with this exact School Code and Name already exists in this list (row #${db.data.schools.indexOf(dup) + 1}).` });
 
   const school = { id: nextId('schools'), list_type, ...pickFields(req.body) };
   db.data.schools.push(school);
@@ -63,6 +98,13 @@ router.put('/:id', async (req, res) => {
   const school = db.data.schools.find(s => s.id === id);
   if (!school) return res.status(404).json({ error: 'not found' });
 
+  const list_type = req.body.list_type || school.list_type;
+  const school_code = req.body.school_code !== undefined ? req.body.school_code : school.school_code;
+  const school_name_address = req.body.school_name_address !== undefined ? req.body.school_name_address : school.school_name_address;
+
+  const dup = findDuplicate(list_type, school_code, school_name_address, id);
+  if (dup) return res.status(409).json({ error: `Duplicate: a school with this exact School Code and Name already exists in this list (row #${db.data.schools.indexOf(dup) + 1}).` });
+
   Object.assign(school, pickFields(req.body));
   await db.write();
   res.json(school);
@@ -74,6 +116,51 @@ router.delete('/:id', async (req, res) => {
   db.data.schools = db.data.schools.filter(s => s.id !== id);
   await db.write();
   res.json({ ok: true });
+});
+
+// POST /api/schools/import  { list_type, agent_id, fileBase64 }
+// Expects an .xlsx matching the export template's column order (title row, list row,
+// header row, then data starting row 4). Rows without a School Name are skipped.
+router.post('/import', async (req, res) => {
+  const { list_type, agent_id, fileBase64 } = req.body;
+  if (!list_type) return res.status(400).json({ error: 'list_type is required' });
+  if (!agent_id) return res.status(400).json({ error: 'agent_id is required — select an area/agent first' });
+  if (!fileBase64) return res.status(400).json({ error: 'fileBase64 is required' });
+
+  try {
+    const buffer = Buffer.from(fileBase64, 'base64');
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer);
+    const sheet = workbook.worksheets[0];
+    if (!sheet) return res.status(400).json({ error: 'No worksheet found in file' });
+
+    let imported = 0;
+    let skipped = 0;
+    sheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+      if (rowNumber < 4) return; // skip title/list/header rows
+      const nameCell = row.getCell(3).value; // col 3 = School Name / Address
+      if (!nameCell) return;
+
+      const codeCell = row.getCell(2).value;
+      if (findDuplicate(list_type, codeCell, nameCell, null)) { skipped++; return; }
+
+      const rec = { id: nextId('schools'), agent_id: Number(agent_id), list_type };
+      IMPORT_COLUMNS.forEach((field, idx) => {
+        if (!field) return;
+        const cell = row.getCell(idx + 2); // +2: col1=S.N., col2=first data field
+        let v = cell.value;
+        if (v && typeof v === 'object' && v.text) v = v.text; // rich text cells
+        rec[field] = v ?? '';
+      });
+      db.data.schools.push(rec);
+      imported++;
+    });
+
+    await db.write();
+    res.json({ imported, skipped });
+  } catch (err) {
+    res.status(400).json({ error: 'Could not read file: ' + err.message });
+  }
 });
 
 module.exports = router;
