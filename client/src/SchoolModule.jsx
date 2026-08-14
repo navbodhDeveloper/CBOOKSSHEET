@@ -28,9 +28,9 @@ const COLUMNS = [
   ['NET_SPE_2021', '2021 NET SPE'],
   ['NET_SPE_2022', '2022 NET SPE'],
   ['NET_SPE_2023', '2023 NET SPE'],
-  ['visit_1', '(Date/Location)'],
-  ['visit_2', '(Date/Location)'],
-  ['visit_3', '(Date/Location)'],
+  ['visit_1', 'App (Date/Location)'],
+  ['visit_2', 'App (Date/Location)'],
+  ['visit_3', 'App (Date/Location)'],
   ['order_2021', '21 Order'],
   ['vapasi_2021', '21 Vapasi'],
   ['NET_ORDER_2021', '21 Net Order'],
@@ -40,10 +40,10 @@ const COLUMNS = [
   ['order_2023', '23 Order'],
   ['vapasi_2023', '23 Vapasi'],
   ['NET_ORDER_2023', '23 Net Order'],
-  ['yog_amt', 'Y'],
-  ['ayog_amt', 'A'],
-  ['total_amt', 'T'],
-  ['REMAINING', 'R'],
+  ['yog_amt', 'Yog'],
+  ['ayog_amt', 'Ayog'],
+  ['total_amt', 'Total'],
+  ['REMAINING', 'Remaining'],
   ['supplying_party', 'Supplying Party'],
   ['discussion_2023', 'Discussion 2023'],
   ['discussion_2024', 'Discussion 2024'],
@@ -391,4 +391,4 @@ function SchoolRow({ school, index, updateLocal, queueSave, onDelete }) {
       </td>
     </tr>
   );
-}
+} 
