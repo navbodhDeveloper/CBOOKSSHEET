@@ -417,9 +417,9 @@
     "areas": 3,
     "agents": 3,
     "book_types": 14,
-    "challans": 6,
+    "challans": 7,
     "returns": 6,
-    "schools": 837,
+    "schools": 839,
     "order_rows": 108,
     "order_row_years": 186,
     "parties": 6
@@ -18726,11 +18726,11 @@
       "remark": ""
     },
     {
-      "id": 837,
+      "id": 839,
       "list_type": "MASTER",
       "agent_id": 2,
-      "school_code": "",
-      "school_name_address": "A.B.M. H.S.SCHOOL BAG DILKUSHA VIKAS NAGAR LALA LAJPAT RAI COLONY AISHBAGH BHOPAL ",
+      "school_code": "125ABM1",
+      "school_name_address": "",
       "principal_name_mobile": "",
       "grade": "",
       "medium": "",

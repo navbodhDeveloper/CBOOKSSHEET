@@ -15,6 +15,7 @@ export default function ChallanModule({ setStatus }) {
   const [rows, setRows] = useState([]);
   const [sheetLoaded, setSheetLoaded] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingAgent, setEditingAgent] = useState(null);
 
   const loadMeta = useCallback(async () => {
     const [ag, bt, st] = await Promise.all([api('/agents'), api('/book-types'), api('/states')]);
@@ -33,19 +34,18 @@ export default function ChallanModule({ setStatus }) {
 
   const agentsInState = agents.filter(a => (a.state || 'MP') === selectedState);
 
-  function resolveAgentId() {
-    const match = agentsInState.find(a => `${a.name} (${a.area_label})` === agentSearch);
-    return match ? match.id : null;
+  function resolveAgent() {
+    return agentsInState.find(a => `${a.name} (${a.area_label})` === agentSearch) || null;
   }
 
   async function loadSheet() {
-    const agentId = resolveAgentId();
-    if (!agentId) { setStatus('Please select a valid agent from the list', true); return; }
+    const agent = resolveAgent();
+    if (!agent) { setStatus('Please select a valid agent from the list', true); return; }
 
-    setSelectedAgentId(agentId);
+    setSelectedAgentId(agent.id);
     setSelectedYear(year);
 
-    const data = await api(`/challans?agent_id=${agentId}&year=${year}`);
+    const data = await api(`/challans?agent_id=${agent.id}&year=${year}`);
     const maxLen = Math.max(data.challans.length, data.returns.length);
     const combined = [];
     for (let i = 0; i < maxLen; i++) {
@@ -58,15 +58,34 @@ export default function ChallanModule({ setStatus }) {
     setStatus('Sheet loaded');
   }
 
-  async function handleCreateAgent({ name, state, region_name, area_code }) {
+  async function handleSaveAgent({ id, name, state, region_name, area_code }) {
     try {
-      await api('/agents', { method: 'POST', body: JSON.stringify({ name, state, region_name, area_code }) });
-      setStatus('Agent created');
+      if (id) {
+        await api(`/agents/${id}`, { method: 'PUT', body: JSON.stringify({ name, state, region_name, area_code }) });
+        setStatus('Agent updated');
+      } else {
+        await api('/agents', { method: 'POST', body: JSON.stringify({ name, state, region_name, area_code }) });
+        setStatus('Agent created');
+      }
       setDialogOpen(false);
+      setEditingAgent(null);
       await loadMeta();
+      setAgentSearch(''); // the old "name (area)" text may no longer match after an edit
     } catch (err) {
       setStatus(err.message, true);
     }
+  }
+
+  function openNewAgentDialog() {
+    setEditingAgent(null);
+    setDialogOpen(true);
+  }
+
+  function openUpdateAgentDialog() {
+    const agent = resolveAgent();
+    if (!agent) { setStatus('Select an agent from the list first', true); return; }
+    setEditingAgent(agent);
+    setDialogOpen(true);
   }
 
   function doExport() {
@@ -112,7 +131,8 @@ export default function ChallanModule({ setStatus }) {
           </select>
         </div>
         <button onClick={() => loadSheet().catch(err => setStatus(err.message, true))}>Load Sheet</button>
-        <button className="secondary" onClick={() => setDialogOpen(true)}>+ New Agent</button>
+        <button className="secondary" onClick={openNewAgentDialog}>+ New Agent</button>
+        <button className="secondary" onClick={openUpdateAgentDialog}>✎ Update Agent</button>
         <button className="secondary" disabled={!sheetLoaded} onClick={doExport}>⬇ Export to Excel</button>
       </section>
 
@@ -128,8 +148,9 @@ export default function ChallanModule({ setStatus }) {
 
       <NewAgentDialog
         open={dialogOpen}
-        onClose={() => setDialogOpen(false)}
-        onCreate={handleCreateAgent}
+        agent={editingAgent}
+        onClose={() => { setDialogOpen(false); setEditingAgent(null); }}
+        onCreate={handleSaveAgent}
       />
     </>
   );

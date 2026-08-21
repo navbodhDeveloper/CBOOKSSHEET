@@ -25,8 +25,8 @@ async function start() {
   app.use('/api/schools', schoolRoutes);
   app.use('/api/export', exportSchoolsRoutes);
   app.use('/api', metaRoutes);
-  app.use('/api/parties', partyRoutes);
-  app.use('/api/export', exportPartiesRoutes);
+  app.use('/api/parties', partyRoutes); 
+  app.use('/api/export', exportPartiesRoutes);  
   app.use('/api/challans', challanRoutes);
   app.use('/api/export', exportRoutes);
   app.get('/health', (req, res) => res.json({ ok: true }));
