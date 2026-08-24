@@ -3,36 +3,6 @@ const router = express.Router();
 const ExcelJS = require('exceljs');
 const { db, nextId } = require('../db');
 
-// Same column order as the export template (server/routes/export-schools.js).
-// null = computed column (NET SPE / NET ORDER), skipped on import since it's derived.
-const IMPORT_COLUMNS = [
-  'school_code', 'school_name_address', 'principal_name_mobile', 'grade', 'medium', 'board',
-  'specimen_give_month', 'book_delivery_month',
-  'specimen_given_2021', 'specimen_given_2022', 'specimen_given_2023',
-  'specimen_returned_2021', 'specimen_returned_2022', 'specimen_returned_2023',
-  null, null, null, // 2021/2022/2023 NET SPE (computed)
-  'visit_1', 'visit_2', 'visit_3',
-  'order_2021', 'vapasi_2021', null, // 21 Net Order (computed)
-  'order_2022', 'vapasi_2022', null, // 22 Net Order (computed)
-  'order_2023', 'vapasi_2023', null, // 23 Net Order (computed)
-  'yog_amt', 'ayog_amt', 'total_amt', null, // R (computed)
-  'supplying_party', 'discussion_2023', 'discussion_2024', 'remark',
-];
-
-// All editable fields, in the exact original column order
-const FIELDS = [
-  'agent_id',
-  'school_code', 'school_name_address', 'principal_name_mobile',
-  'grade', 'medium', 'board',
-  'specimen_give_month', 'book_delivery_month',
-  'specimen_given_2021', 'specimen_given_2022', 'specimen_given_2023',
-  'specimen_returned_2021', 'specimen_returned_2022', 'specimen_returned_2023',
-  'visit_1', 'visit_2', 'visit_3',
-  'order_2021', 'vapasi_2021', 'order_2022', 'vapasi_2022', 'order_2023', 'vapasi_2023',
-  'yog_amt', 'ayog_amt', 'total_amt',
-  'supplying_party', 'discussion_2023', 'discussion_2024', 'remark',
-];
-
 function cellToValue(v) {
   if (v == null) return '';
   if (typeof v === 'object') {
@@ -51,6 +21,36 @@ function pickFields(body) {
   }
   return out;
 }
+
+// Same column order as the export template (server/routes/export-schools.js).
+// null = computed column (NET SPE / NET ORDER / R), skipped on import since it's derived.
+const IMPORT_COLUMNS = [
+  'school_code', 'school_name_address', 'principal_name_mobile', 'grade', 'medium', 'board',
+  'specimen_give_month', 'book_delivery_month',
+  'specimen_given_2021', 'specimen_given_2022', 'specimen_given_2023',
+  'specimen_returned_2021', 'specimen_returned_2022', 'specimen_returned_2023',
+  null, null, null, // 2021/2022/2023 NET SPE (computed)
+  'visit_1', 'visit_2', 'visit_3',
+  'order_2021', 'vapasi_2021', null, 'yog_2021', 'ayog_2021', 'total_2021', null, // 21: Order, Vapasi, Net Order(computed), Y, A, T, R(computed)
+  'order_2022', 'vapasi_2022', null, 'yog_2022', 'ayog_2022', 'total_2022', null,
+  'order_2023', 'vapasi_2023', null, 'yog_2023', 'ayog_2023', 'total_2023', null,
+  'supplying_party', 'discussion_2023', 'discussion_2024', 'remark',
+];
+
+// All editable fields, in the exact original column order
+const FIELDS = [
+  'agent_id',
+  'school_code', 'school_name_address', 'principal_name_mobile',
+  'grade', 'medium', 'board',
+  'specimen_give_month', 'book_delivery_month',
+  'specimen_given_2021', 'specimen_given_2022', 'specimen_given_2023',
+  'specimen_returned_2021', 'specimen_returned_2022', 'specimen_returned_2023',
+  'visit_1', 'visit_2', 'visit_3',
+  'order_2021', 'vapasi_2021', 'yog_2021', 'ayog_2021', 'total_2021',
+  'order_2022', 'vapasi_2022', 'yog_2022', 'ayog_2022', 'total_2022',
+  'order_2023', 'vapasi_2023', 'yog_2023', 'ayog_2023', 'total_2023',
+  'supplying_party', 'discussion_2023', 'discussion_2024', 'remark',
+];
 
 // Same School Code + School Name/Address already exists anywhere in this list
 // (Master/New/CBSE), regardless of which agent owns it.
@@ -130,8 +130,6 @@ router.delete('/:id', async (req, res) => {
 });
 
 // POST /api/schools/import  { list_type, agent_id, fileBase64 }
-// Expects an .xlsx matching the export template's column order (title row, list row,
-// header row, then data starting row 4). Rows without a School Name are skipped.
 router.post('/import', async (req, res) => {
   const { list_type, agent_id, fileBase64 } = req.body;
   if (!list_type) return res.status(400).json({ error: 'list_type is required' });
@@ -172,18 +170,16 @@ router.post('/import', async (req, res) => {
 });
 
 // POST /api/schools/dedupe?list_type=MASTER
-// Removes existing duplicate rows (same School Code + School Name/Address, case/whitespace-insensitive)
-// within a list, keeping the earliest one. One-time cleanup for data added before duplicate checking existed.
 router.post('/dedupe', async (req, res) => {
   const { list_type } = req.body;
   if (!list_type) return res.status(400).json({ error: 'list_type is required' });
 
-  const seen = new Map(); // key -> kept school
+  const seen = new Map();
   const toRemove = [];
   for (const s of db.data.schools) {
     if (s.list_type !== list_type) continue;
     const key = `${(s.school_code || '').trim().toLowerCase()}|${(s.school_name_address || '').trim().toLowerCase()}`;
-    if (!key.trim() || key === '|') continue; // skip blank rows, nothing to dedupe on
+    if (!key.trim() || key === '|') continue;
     if (seen.has(key)) {
       toRemove.push(s.id);
     } else {

@@ -192,3 +192,33 @@ table.order-grid th, table.order-grid td { font-size: 11px; }
 table.summary-grid { max-width: 900px; }
 .summary-note { font-size: 11px; color: #666; max-width: 900px; margin-top: 10px; }
 .flag-group { display: flex; justify-content: center; }
+
+.duplicate-row td {
+  background: #ffe0e0 !important;
+}
+.duplicate-row td input,
+.duplicate-row td textarea,
+.duplicate-row td select {
+  background: transparent;
+}
+
+table.school-grid th, table.school-grid td {
+  padding: 8px 10px;
+  font-size: 13px;
+  min-width: 90px;
+}
+table.school-grid td input,
+table.school-grid td select {
+  font-size: 13px;
+  padding: 6px 4px;
+  min-height: 30px;
+}
+table.school-grid td textarea {
+  font-size: 13px;
+  padding: 6px;
+  min-height: 54px;
+  min-width: 160px;
+}
+table.school-grid td.text-left {
+  min-width: 200px;
+}

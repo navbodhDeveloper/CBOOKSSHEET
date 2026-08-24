@@ -419,7 +419,7 @@
     "book_types": 14,
     "challans": 7,
     "returns": 6,
-    "schools": 839,
+    "schools": 842,
     "order_rows": 108,
     "order_row_years": 186,
     "parties": 6
@@ -17733,32 +17733,13 @@
       "list_type": "MASTER",
       "school_code": "125ABM1",
       "school_name_address": "A.B.M. H.S.SCHOOL BAG DILKUSHA VIKAS NAGAR LALA LAJPAT RAI COLONY AISHBAGH BHOPAL ",
-      "principal_name_mobile": {
-        "richText": [
-          {
-            "text": "SMT. NIRAVAT PAKHER\r\n8982300919\r\n0755 275 6570\r\nShri Yunus Khan\r\n7000301595\r\n"
-          },
-          {
-            "font": {
-              "bold": true,
-              "size": 12,
-              "color": {
-                "theme": 1
-              },
-              "name": "Cambria",
-              "family": 1,
-              "scheme": "major"
-            },
-            "text": "7000311595"
-          }
-        ]
-      },
+      "principal_name_mobile": "[object Object]\n\n\n",
       "grade": "B",
       "medium": "B",
       "board": "MP",
       "specimen_give_month": "JAN",
       "book_delivery_month": "MAR",
-      "specimen_given_2021": "",
+      "specimen_given_2021": "5",
       "specimen_given_2022": "",
       "specimen_given_2023": "",
       "specimen_returned_2021": "",
@@ -17810,7 +17791,7 @@
       "specimen_give_month": "JAN",
       "book_delivery_month": "MAR",
       "specimen_given_2021": "",
-      "specimen_given_2022": "",
+      "specimen_given_2022": "2",
       "specimen_given_2023": "",
       "specimen_returned_2021": "",
       "specimen_returned_2022": "",
@@ -18730,6 +18711,76 @@
       "list_type": "MASTER",
       "agent_id": 2,
       "school_code": "125ABM1",
+      "school_name_address": "",
+      "principal_name_mobile": "",
+      "grade": "",
+      "medium": "",
+      "board": "",
+      "specimen_give_month": "",
+      "book_delivery_month": "",
+      "specimen_given_2021": "",
+      "specimen_given_2022": "",
+      "specimen_given_2023": "",
+      "specimen_returned_2021": "",
+      "specimen_returned_2022": "",
+      "specimen_returned_2023": "",
+      "visit_1": "",
+      "visit_2": "",
+      "visit_3": "",
+      "order_2021": "",
+      "vapasi_2021": "",
+      "order_2022": "",
+      "vapasi_2022": "",
+      "order_2023": "",
+      "vapasi_2023": "",
+      "yog_amt": "",
+      "ayog_amt": "",
+      "total_amt": "",
+      "supplying_party": "",
+      "discussion_2023": "",
+      "discussion_2024": "",
+      "remark": ""
+    },
+    {
+      "id": 840,
+      "list_type": "MASTER",
+      "agent_id": 2,
+      "school_code": "125ABM1",
+      "school_name_address": "A.P.J. H.S.SCHOOL KARAMVEER NAGAR INDRAPURI BHOPAL ",
+      "principal_name_mobile": "",
+      "grade": "",
+      "medium": "",
+      "board": "",
+      "specimen_give_month": "",
+      "book_delivery_month": "",
+      "specimen_given_2021": "",
+      "specimen_given_2022": "",
+      "specimen_given_2023": "",
+      "specimen_returned_2021": "",
+      "specimen_returned_2022": "",
+      "specimen_returned_2023": "",
+      "visit_1": "",
+      "visit_2": "",
+      "visit_3": "",
+      "order_2021": "",
+      "vapasi_2021": "",
+      "order_2022": "",
+      "vapasi_2022": "",
+      "order_2023": "",
+      "vapasi_2023": "",
+      "yog_amt": "",
+      "ayog_amt": "",
+      "total_amt": "",
+      "supplying_party": "",
+      "discussion_2023": "",
+      "discussion_2024": "",
+      "remark": ""
+    },
+    {
+      "id": 841,
+      "list_type": "MASTER",
+      "agent_id": 2,
+      "school_code": "",
       "school_name_address": "",
       "principal_name_mobile": "",
       "grade": "",
@@ -22456,7 +22507,8 @@
       "order_no": "123as2",
       "party_name": "Party 1",
       "amt_received": 10000,
-      "amt_return": 2000
+      "amt_return": 2000,
+      "year": 2026
     },
     {
       "id": 2,
@@ -22464,7 +22516,8 @@
       "order_no": "234hh12",
       "party_name": "Party 2",
       "amt_received": 50000,
-      "amt_return": 1000
+      "amt_return": 1000,
+      "year": 2026
     },
     {
       "id": 3,
@@ -22472,7 +22525,8 @@
       "order_no": "1234sas4",
       "party_name": "Party 3",
       "amt_received": 150000,
-      "amt_return": 20000
+      "amt_return": 20000,
+      "year": 2026
     },
     {
       "id": 4,
@@ -22481,7 +22535,8 @@
       "party_name": "Party 1",
       "amt_received": 10000,
       "amt_return": 8000,
-      "remark": "Not Getting Response"
+      "remark": "Not Getting Response",
+      "year": 2028
     },
     {
       "id": 5,
@@ -22490,7 +22545,8 @@
       "party_name": "Party 2",
       "amt_received": 200000,
       "amt_return": 50000,
-      "remark": "book nhi mila"
+      "remark": "book nhi mila",
+      "year": 2027
     }
   ]
 }

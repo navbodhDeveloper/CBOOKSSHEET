@@ -42,7 +42,11 @@ async function init() {
   // Backfill: existing regions created before the state field existed default to MP
   // (all seeded/real agents so far are Madhya Pradesh based).
   for (const region of db.data.regions) {
-    region.state ||= 'MP';
+    region.state ||= 'MP';  
+  }
+
+    for (const p of db.data.parties) {
+    p.year ||= new Date().getFullYear();
   }
 
   // Seed book types once
