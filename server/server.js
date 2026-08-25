@@ -9,8 +9,8 @@ const exportPartiesRoutes = require('./routes/export-parties');
 const metaRoutes = require('./routes/meta');
 const challanRoutes = require('./routes/challans');
 const exportRoutes = require('./routes/export');
-const orderDetailRoutes = require('./routes/order-details');
-const exportOrderDetailRoutes = require('./routes/export-order-details');
+// const orderDetailRoutes = require('./routes/order-details');
+// const exportOrderDetailRoutes = require('./routes/export-order-details');
 
 async function start() {
   await init(); // load/seed the JSON database
@@ -20,8 +20,8 @@ async function start() {
   app.use(express.json({ limit: '15mb' }));
 
 
-  app.use('/api/order-details', orderDetailRoutes);
-  app.use('/api/export', exportOrderDetailRoutes);
+  // app.use('/api/order-details', orderDetailRoutes);
+  // app.use('/api/export', exportOrderDetailRoutes);
   app.use('/api/schools', schoolRoutes);
   app.use('/api/export', exportSchoolsRoutes);
   app.use('/api', metaRoutes);

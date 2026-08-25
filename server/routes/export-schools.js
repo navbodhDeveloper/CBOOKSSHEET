@@ -28,22 +28,30 @@ const COLUMNS = [
   [null, '2021 NET SPE', 10, s => (Number(s.specimen_given_2021) || 0) - (Number(s.specimen_returned_2021) || 0)],
   [null, '2022 NET SPE', 10, s => (Number(s.specimen_given_2022) || 0) - (Number(s.specimen_returned_2022) || 0)],
   [null, '2023 NET SPE', 10, s => (Number(s.specimen_given_2023) || 0) - (Number(s.specimen_returned_2023) || 0)],
-  ['visit_1', 'App (Date/Location)', 16],
-  ['visit_2', 'App (Date/Location)', 16],
-  ['visit_3', 'App (Date/Location)', 16],
+  ['visit_1', '(Date/Location)', 16],
+  ['visit_2', '(Date/Location)', 16],
+  ['visit_3', '(Date/Location)', 16],
   ['order_2021', '21 Order', 10],
   ['vapasi_2021', '21 Vapasi', 10],
   [null, '21 Net Order', 10, s => (Number(s.order_2021) || 0) - (Number(s.vapasi_2021) || 0)],
+  ['yog_2021', '21 Y', 8],
+  ['ayog_2021', '21 A', 8],
+  ['total_2021', '21 T', 8],
+  [null, '21 R', 8, s => (Number(s.total_2021) || 0) - (Number(s.yog_2021) || 0) - (Number(s.ayog_2021) || 0)],
   ['order_2022', '22 Order', 10],
   ['vapasi_2022', '22 Vapasi', 10],
   [null, '22 Net Order', 10, s => (Number(s.order_2022) || 0) - (Number(s.vapasi_2022) || 0)],
+  ['yog_2022', '22 Y', 8],
+  ['ayog_2022', '22 A', 8],
+  ['total_2022', '22 T', 8],
+  [null, '22 R', 8, s => (Number(s.total_2022) || 0) - (Number(s.yog_2022) || 0) - (Number(s.ayog_2022) || 0)],
   ['order_2023', '23 Order', 10],
   ['vapasi_2023', '23 Vapasi', 10],
   [null, '23 Net Order', 10, s => (Number(s.order_2023) || 0) - (Number(s.vapasi_2023) || 0)],
-  ['yog_amt', 'Yog', 8],
-  ['ayog_amt', 'Ayog', 8],
-  ['total_amt', 'Total', 8],
-  [null, 'Remaining', 8, s => (Number(s.total_amt) || 0) - (Number(s.yog_amt) || 0) - (Number(s.ayog_amt) || 0)],
+  ['yog_2023', '23 Y', 8],
+  ['ayog_2023', '23 A', 8],
+  ['total_2023', '23 T', 8],
+  [null, '23 R', 8, s => (Number(s.total_2023) || 0) - (Number(s.yog_2023) || 0) - (Number(s.ayog_2023) || 0)],
   ['supplying_party', 'Supplying Party', 16],
   ['discussion_2023', 'Discussion 2023', 24],
   ['discussion_2024', 'Discussion 2024', 24],
@@ -56,16 +64,14 @@ router.get('/school-list', async (req, res) => {
     return res.status(400).json({ error: 'valid list_type is required (MASTER, MASTER_NEW, or CBSE)' });
   }
 
-  let schools = db.data.schools
-    .filter(s => s.list_type === list_type);
+  let schools = db.data.schools.filter(s => s.list_type === list_type);
   if (agent_id) schools = schools.filter(s => String(s.agent_id) === String(agent_id));
-  schools = schools
-    .sort((a, b) => a.id - b.id);
+  schools = schools.sort((a, b) => a.id - b.id);
 
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet(LIST_LABELS[list_type]);
 
-  const lastCol = COLUMNS.length + 1; // +1 for S.N.
+  const lastCol = COLUMNS.length + 1;
 
   sheet.mergeCells(1, 1, 1, lastCol);
   const titleCell = sheet.getCell(1, 1);

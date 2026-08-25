@@ -1,13 +1,13 @@
 import { useState, useRef, useCallback } from 'react';
 import ChallanModule from './ChallanModule';
 import SchoolModule from './SchoolModule';
-import OrderDetailModule from './OrderDetailModule';
+// import OrderDetailModule from './OrderDetailModule';
 import PartyModule from './PartyModule';
 
 const MODULES = [
   { key: 'challan', label: 'C.Book Challan Issue Details' },
   { key: 'school', label: 'School Master List' },
-  { key: 'orders', label: '3-Year Specimen & Order Detail' },
+  // { key: 'orders', label: '3-Year Specimen & Order Detail' },
   { key: 'parties', label: 'Parties' },
 ];
 
@@ -43,7 +43,7 @@ export default function App() {
 
       {activeModule === 'challan' && <ChallanModule setStatus={setStatus} />}
       {activeModule === 'school' && <SchoolModule setStatus={setStatus} />}
-      {activeModule === 'orders' && <OrderDetailModule setStatus={setStatus} />}
+      {/* {activeModule === 'orders' && <OrderDetailModule setStatus={setStatus} />} */}
       {activeModule === 'parties' && <PartyModule setStatus={setStatus} />}
 
       <div className={`global-status ${statusError ? 'error' : ''}`}>{status}</div>
