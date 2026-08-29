@@ -122,42 +122,69 @@ router.get('/parties', async (req, res) => {
   r += 2;
 
   // Party-wise Total: same party name can appear on multiple rows (repeat orders),
-  // so group by trimmed/case-insensitive name and sum Sale Details/Return across all 3 years.
-  const partyTotalsMap = {};
+  // so group by trimmed/case-insensitive name and sum Sale Details/Return PER YEAR
+  // (not flattened) — matches the main table's year-by-year breakdown.
+  const partyYearTotalsMap = {};
   parties.forEach(p => {
     const name = (p.party_name || '').trim();
     if (!name) return;
     const key = name.toLowerCase();
-    if (!partyTotalsMap[key]) partyTotalsMap[key] = { name, details: 0, ret: 0 };
+    if (!partyYearTotalsMap[key]) {
+      partyYearTotalsMap[key] = { name, years: {} };
+      years.forEach(y => { partyYearTotalsMap[key].years[y] = { details: 0, ret: 0 }; });
+    }
     years.forEach(y => {
-      partyTotalsMap[key].details += Number(p[`sale_details_${y}`]) || 0;
-      partyTotalsMap[key].ret += Number(p[`sale_return_${y}`]) || 0;
+      partyYearTotalsMap[key].years[y].details += Number(p[`sale_details_${y}`]) || 0;
+      partyYearTotalsMap[key].years[y].ret += Number(p[`sale_return_${y}`]) || 0;
     });
   });
-  const partyTotalsList = Object.values(partyTotalsMap).sort((a, b) => a.name.localeCompare(b.name));
+  const partyYearTotalsList = Object.values(partyYearTotalsMap).sort((a, b) => a.name.localeCompare(b.name));
 
-  if (partyTotalsList.length) {
+  if (partyYearTotalsList.length) {
     sheet.getCell(r, 1).value = 'Party-wise Total';
     sheet.getCell(r, 1).font = { bold: true, size: 12 };
     r++;
-    const ptHeaderRow = r;
-    sheet.getCell(r, 1).value = 'Party Name';
-    sheet.getCell(r, 2).value = 'Sale Details';
-    sheet.getCell(r, 3).value = 'Sale Return';
-    sheet.getCell(r, 4).value = 'Net Sale';
-    for (let c = 1; c <= 4; c++) sheet.getCell(ptHeaderRow, c).font = { bold: true };
-    sheet.getRow(ptHeaderRow).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } };
-    r++;
-    partyTotalsList.forEach(pt => {
-      sheet.getCell(r, 1).value = pt.name;
-      sheet.getCell(r, 2).value = pt.details;
-      sheet.getCell(r, 3).value = pt.ret;
-      sheet.getCell(r, 4).value = pt.details - pt.ret;
+    // Reuse the same column layout as the main table: Party Name in column 2 (the
+    // wide column), year blocks starting at column 3 — so widths line up visually.
+    const ptHeaderRow1 = r;
+    const ptHeaderRow2 = r + 1;
+    sheet.mergeCells(ptHeaderRow1, 2, ptHeaderRow2, 2);
+    sheet.getCell(ptHeaderRow1, 2).value = 'Party Name';
+    let c = 3;
+    years.forEach(y => {
+      sheet.mergeCells(ptHeaderRow1, c, ptHeaderRow1, c + 2);
+      sheet.getCell(ptHeaderRow1, c).value = y;
+      sheet.getCell(ptHeaderRow2, c).value = 'Sale Details';
+      sheet.getCell(ptHeaderRow2, c + 1).value = 'Sale Return';
+      sheet.getCell(ptHeaderRow2, c + 2).value = 'Net Sale';
+      c += 3;
+    });
+    const ptLastCol = c - 1;
+    for (let row = ptHeaderRow1; row <= ptHeaderRow2; row++) {
+      for (let col2 = 2; col2 <= ptLastCol; col2++) {
+        const cell = sheet.getCell(row, col2);
+        cell.font = { bold: true };
+        cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      }
+      sheet.getRow(row).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } };
+    }
+    r = ptHeaderRow2 + 1;
+    partyYearTotalsList.forEach(pt => {
+      sheet.getCell(r, 2).value = pt.name;
+      let cc = 3;
+      years.forEach(y => {
+        const yd = pt.years[y];
+        sheet.getCell(r, cc).value = yd.details;
+        sheet.getCell(r, cc + 1).value = yd.ret;
+        sheet.getCell(r, cc + 2).value = yd.details - yd.ret;
+        cc += 3;
+      });
       r++;
     });
-    for (let row = ptHeaderRow; row < r; row++) {
-      for (let c = 1; c <= 4; c++) {
-        sheet.getCell(row, c).border = {
+    const ptLastDataRow = r - 1;
+    for (let row = ptHeaderRow1; row <= ptLastDataRow; row++) {
+      for (let col2 = 2; col2 <= ptLastCol; col2++) {
+        sheet.getCell(row, col2).border = {
           top: { style: 'thin' }, left: { style: 'thin' },
           bottom: { style: 'thin' }, right: { style: 'thin' },
         };

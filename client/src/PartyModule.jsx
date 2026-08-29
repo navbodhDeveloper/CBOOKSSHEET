@@ -202,19 +202,23 @@ export default function PartyModule({ setStatus }) {
   const remarkColIndex = 2 + years.length * 2;
 
   // Party-wise totals: same party name can appear on multiple rows (repeat orders),
-  // so group by trimmed/case-insensitive name and sum across all 3 years.
-  const partyTotalsMap = {};
+  // so group by trimmed/case-insensitive name and sum PER YEAR (not flattened) so the
+  // breakdown matches how the main grid and export show data — year by year.
+  const partyYearTotalsMap = {};
   parties.forEach(p => {
     const name = (p.party_name || '').trim();
     if (!name) return;
     const key = name.toLowerCase();
-    if (!partyTotalsMap[key]) partyTotalsMap[key] = { name, details: 0, ret: 0 };
+    if (!partyYearTotalsMap[key]) {
+      partyYearTotalsMap[key] = { name, years: {} };
+      years.forEach(y => { partyYearTotalsMap[key].years[y] = { details: 0, ret: 0 }; });
+    }
     years.forEach(y => {
-      partyTotalsMap[key].details += Number(p[`sale_details_${y}`]) || 0;
-      partyTotalsMap[key].ret += Number(p[`sale_return_${y}`]) || 0;
+      partyYearTotalsMap[key].years[y].details += Number(p[`sale_details_${y}`]) || 0;
+      partyYearTotalsMap[key].years[y].ret += Number(p[`sale_return_${y}`]) || 0;
     });
   });
-  const partyTotalsList = Object.values(partyTotalsMap).sort((a, b) => a.name.localeCompare(b.name));
+  const partyYearTotalsList = Object.values(partyYearTotalsMap).sort((a, b) => a.name.localeCompare(b.name));
 
   return (
     <>
@@ -387,29 +391,45 @@ export default function PartyModule({ setStatus }) {
             </div>
           )}
 
-          {partyTotalsList.length > 0 && (
+          {partyYearTotalsList.length > 0 && (
             <div className="summary-tables">
               <h3>Party-wise Total</h3>
-              <table className="grid summary-grid">
-                <thead>
-                  <tr>
-                    <th>Party Name</th>
-                    <th>Sale Details</th>
-                    <th>Sale Return</th>
-                    <th>Net Sale</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {partyTotalsList.map(pt => (
-                    <tr key={pt.name}>
-                      <td className="text-left">{pt.name}</td>
-                      <td>{pt.details}</td>
-                      <td>{pt.ret}</td>
-                      <td>{pt.details - pt.ret}</td>
+              <div className="table-scroll">
+                <table className="grid summary-grid">
+                  <thead>
+                    <tr>
+                      <th rowSpan={2}>Party Name</th>
+                      {years.map(y => <th key={y} colSpan={3}>{y}</th>)}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                    <tr>
+                      {years.map(y => (
+                        <Fragment key={y}>
+                          <th>Sale Details</th>
+                          <th>Sale Return</th>
+                          <th>Net Sale</th>
+                        </Fragment>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {partyYearTotalsList.map(pt => (
+                      <tr key={pt.name}>
+                        <td className="text-left">{pt.name}</td>
+                        {years.map(y => {
+                          const yd = pt.years[y];
+                          return (
+                            <Fragment key={y}>
+                              <td>{yd.details}</td>
+                              <td>{yd.ret}</td>
+                              <td>{yd.details - yd.ret}</td>
+                            </Fragment>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </>
