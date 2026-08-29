@@ -14,7 +14,7 @@ const defaultData = {
   schools: [],              // { id, agent_id, list_type, school_code, school_name_address, ... } — see routes/schools.js for full field list
   order_rows: [],             // { id, agent_id, cycle_start_year, s_no, school_party_name, party_type, new_school_flag, remark }
   order_row_years: [],         // { id, order_row_id, year, elig, given, returned, balance, order_amt, order_ret_amt, balance_amt, defaulter, order_cut }
-  parties: [],                  // { id, agent_id, order_no, party_name, amt_received, amt_return }
+  parties: [],                  // { id, agent_id, cycle_start_year, s_no, party_name, sale_details_<year>, sale_return_<year> (one pair per year in the 3-year cycle), remark }
   _seq: { regions: 0, areas: 0, agents: 0, book_types: 0, challans: 0, returns: 0, schools: 0, order_rows: 0, order_row_years: 0, parties: 0 },
 };
 
@@ -42,12 +42,17 @@ async function init() {
   // Backfill: existing regions created before the state field existed default to MP
   // (all seeded/real agents so far are Madhya Pradesh based).
   for (const region of db.data.regions) {
-    region.state ||= 'MP';  
+    region.state ||= 'MP';
   }
 
-    for (const p of db.data.parties) {
-    p.year ||= new Date().getFullYear();
-  }
+  // Schema change: Parties moved from one-row-per-year (order_no/amt_received/amt_return/year)
+  // to one-row-per-party spanning a full 3-year cycle (cycle_start_year/s_no/sale_details_<year>/
+  // sale_return_<year>). Discard any rows still in the old shape so the new UI/routes never see
+  // stale/incompatible data. (Per explicit user instruction — old Party 1/Party 2 test rows are
+  // intentionally dropped, not migrated.)
+  db.data.parties = db.data.parties.filter(
+    p => p.amt_received === undefined && p.amt_return === undefined && p.order_no === undefined
+  );
 
   // Seed book types once
   if (db.data.book_types.length === 0) {

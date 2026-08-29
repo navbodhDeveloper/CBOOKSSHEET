@@ -9,6 +9,8 @@ const LIST_TABS = [
 
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 
+// Field/label pairs, in the exact sequence from the reference sheet.
+// specimen_given_2021/22/23 = "Specimen Given Yogya" (reused from before so existing data carries over)
 const COLUMNS = [
   ['school_code', 'School Code'],
   ['school_name_address', 'School Name / Address'],
@@ -18,39 +20,41 @@ const COLUMNS = [
   ['board', 'Board'],
   ['specimen_give_month', 'Specimen Give Month'],
   ['book_delivery_month', 'Book Delivery Month'],
-  ['specimen_given_2021', 'Specimen Given 2021'],
-  ['specimen_given_2022', 'Specimen Given 2022'],
-  ['specimen_given_2023', 'Specimen Given 2023'],
-  ['specimen_returned_2021', 'Specimen Returned 2021'],
-  ['specimen_returned_2022', 'Specimen Returned 2022'],
-  ['specimen_returned_2023', 'Specimen Returned 2023'],
+
+  ['specimen_given_2021', '2021 Specimen Given Yogya'],
+  ['specimen_given_ayogya_2021', '2021 Specimen Given Ayogya'],
+  ['TOTAL_DISTRIBUTE_2021', '2021 Total Spec. Distribute'],
+  ['specimen_returned_2021', '2021 Specimen Returned'],
   ['NET_SPE_2021', '2021 NET SPE'],
+
+  ['specimen_given_2022', '2022 Specimen Given Yogya'],
+  ['specimen_given_ayogya_2022', '2022 Specimen Given Ayogya'],
+  ['TOTAL_DISTRIBUTE_2022', '2022 Total Spec. Distribute'],
+  ['specimen_returned_2022', '2022 Specimen Returned'],
   ['NET_SPE_2022', '2022 NET SPE'],
+
+  ['specimen_given_2023', '2023 Specimen Given Yogya'],
+  ['specimen_given_ayogya_2023', '2023 Specimen Given Ayogya'],
+  ['TOTAL_DISTRIBUTE_2023', '2023 Total Spec. Distribute'],
+  ['specimen_returned_2023', '2023 Specimen Returned'],
   ['NET_SPE_2023', '2023 NET SPE'],
-  ['visit_1', '(Date/Location)'],
-  ['visit_2', '(Date/Location)'],
-  ['visit_3', '(Date/Location)'],
-  ['order_2021', '21 Order'],
-  ['vapasi_2021', '21 Vapasi'],
-  ['NET_ORDER_2021', '21 Net Order'],
-  ['yog_2021', '21 Yog'],
-  ['ayog_2021', '21 Ayog'],
-  ['total_2021', '21 Total'],
-  ['REMAINING_2021', '21 Remaining'],
-  ['order_2022', '22 Order'],
-  ['vapasi_2022', '22 Vapasi'],
-  ['NET_ORDER_2022', '22 Net Order'],
-  ['yog_2022', '22 Yog'],
-  ['ayog_2022', '22 Ayog'],
-  ['total_2022', '22 Total'],
-  ['REMAINING_2022', '22 Remaining'],
-  ['order_2023', '23 Order'],
-  ['vapasi_2023', '23 Vapasi'],
-  ['NET_ORDER_2023', '23 Net Order'],
-  ['yog_2023', '23 Yog'],
-  ['ayog_2023', '23 Ayog'],
-  ['total_2023', '23 Total'],
-  ['REMAINING_2023', '23 Remainig'],
+
+  ['sale_details_2021', '2021 Sale Details'],
+  ['sale_return_2021', '2021 Sale Return'],
+  ['NET_SALE_2021', '2021 Net Sale'],
+
+  ['sale_details_2022', '2022 Sale Details'],
+  ['sale_return_2022', '2022 Sale Return'],
+  ['NET_SALE_2022', '2022 Net Sale'],
+
+  ['sale_details_2023', '2023 Sale Details'],
+  ['sale_return_2023', '2023 Sale Return'],
+  ['NET_SALE_2023', '2023 Net Sale'],
+
+  ['visit_1', 'School Visit Date / App Location - I'],
+  ['visit_2', 'School Visit Date / App Location - II'],
+  ['visit_3', 'School Visit Date / App Location - III'],
+
   ['supplying_party', 'Supplying Party'],
   ['discussion_2023', 'Discussion 2023'],
   ['discussion_2024', 'Discussion 2024'],
@@ -58,24 +62,24 @@ const COLUMNS = [
 ];
 
 const COMPUTED = {
-  NET_SPE_2021: s => (Number(s.specimen_given_2021) || 0) - (Number(s.specimen_returned_2021) || 0),
-  NET_SPE_2022: s => (Number(s.specimen_given_2022) || 0) - (Number(s.specimen_returned_2022) || 0),
-  NET_SPE_2023: s => (Number(s.specimen_given_2023) || 0) - (Number(s.specimen_returned_2023) || 0),
-  NET_ORDER_2021: s => (Number(s.order_2021) || 0) - (Number(s.vapasi_2021) || 0),
-  NET_ORDER_2022: s => (Number(s.order_2022) || 0) - (Number(s.vapasi_2022) || 0),
-  NET_ORDER_2023: s => (Number(s.order_2023) || 0) - (Number(s.vapasi_2023) || 0),
-  REMAINING_2021: s => (Number(s.total_2021) || 0) - (Number(s.yog_2021) || 0) - (Number(s.ayog_2021) || 0),
-  REMAINING_2022: s => (Number(s.total_2022) || 0) - (Number(s.yog_2022) || 0) - (Number(s.ayog_2022) || 0),
-  REMAINING_2023: s => (Number(s.total_2023) || 0) - (Number(s.yog_2023) || 0) - (Number(s.ayog_2023) || 0),
+  TOTAL_DISTRIBUTE_2021: s => (Number(s.specimen_given_2021) || 0) + (Number(s.specimen_given_ayogya_2021) || 0),
+  TOTAL_DISTRIBUTE_2022: s => (Number(s.specimen_given_2022) || 0) + (Number(s.specimen_given_ayogya_2022) || 0),
+  TOTAL_DISTRIBUTE_2023: s => (Number(s.specimen_given_2023) || 0) + (Number(s.specimen_given_ayogya_2023) || 0),
+  NET_SPE_2021: s => ((Number(s.specimen_given_2021) || 0) + (Number(s.specimen_given_ayogya_2021) || 0)) - (Number(s.specimen_returned_2021) || 0),
+  NET_SPE_2022: s => ((Number(s.specimen_given_2022) || 0) + (Number(s.specimen_given_ayogya_2022) || 0)) - (Number(s.specimen_returned_2022) || 0),
+  NET_SPE_2023: s => ((Number(s.specimen_given_2023) || 0) + (Number(s.specimen_given_ayogya_2023) || 0)) - (Number(s.specimen_returned_2023) || 0),
+  NET_SALE_2021: s => (Number(s.sale_details_2021) || 0) - (Number(s.sale_return_2021) || 0),
+  NET_SALE_2022: s => (Number(s.sale_details_2022) || 0) - (Number(s.sale_return_2022) || 0),
+  NET_SALE_2023: s => (Number(s.sale_details_2023) || 0) - (Number(s.sale_return_2023) || 0),
 };
 
 const NUMERIC_FIELDS = new Set([
-  'specimen_given_2021', 'specimen_given_2022', 'specimen_given_2023',
-  'specimen_returned_2021', 'specimen_returned_2022', 'specimen_returned_2023',
-  'order_2021', 'vapasi_2021', 'order_2022', 'vapasi_2022', 'order_2023', 'vapasi_2023',
-  'yog_2021', 'ayog_2021', 'total_2021',
-  'yog_2022', 'ayog_2022', 'total_2022',
-  'yog_2023', 'ayog_2023', 'total_2023',
+  'specimen_given_2021', 'specimen_given_ayogya_2021', 'specimen_returned_2021',
+  'specimen_given_2022', 'specimen_given_ayogya_2022', 'specimen_returned_2022',
+  'specimen_given_2023', 'specimen_given_ayogya_2023', 'specimen_returned_2023',
+  'sale_details_2021', 'sale_return_2021',
+  'sale_details_2022', 'sale_return_2022',
+  'sale_details_2023', 'sale_return_2023',
 ]);
 const TEXTAREA_FIELDS = new Set(['school_name_address', 'principal_name_mobile', 'discussion_2023', 'discussion_2024', 'remark']);
 const MONTH_FIELDS = new Set(['specimen_give_month', 'book_delivery_month']);
@@ -98,7 +102,7 @@ export default function SchoolModule({ setStatus }) {
   const [importing, setImporting] = useState(false);
   const saveTimers = useRef({});
   const fileInputRef = useRef(null);
-  const cellRefs = useRef(new Map()); // "rowIndex-colIndex" -> input/select/textarea element
+  const cellRefs = useRef(new Map());
 
   const [states, setStates] = useState(['MP', 'CG']);
   const [selectedState, setSelectedState] = useState('MP');
@@ -150,7 +154,6 @@ export default function SchoolModule({ setStatus }) {
   useEffect(() => { load(listType, selectedAgentId); setPage(1); }, [listType, selectedAgentId, load]);
   useEffect(() => { setPage(1); }, [search, pageSize]);
 
-  // Build the set of duplicate keys across the whole currently-loaded list (not just this page)
   const duplicateIds = (() => {
     const counts = new Map();
     for (const s of schools) {
@@ -172,7 +175,6 @@ export default function SchoolModule({ setStatus }) {
         (s.school_code || '').toLowerCase().includes(search.toLowerCase()))
     : schools;
 
-  // Sum every numeric/computed column across the full filtered list (all pages, not just the visible one)
   const totals = {};
   for (const [field] of COLUMNS) {
     if (NUMERIC_FIELDS.has(field) || COMPUTED[field]) {

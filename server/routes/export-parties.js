@@ -3,110 +3,183 @@ const router = express.Router();
 const ExcelJS = require('exceljs');
 const { db } = require('../db');
 
+function colToLetter(n) {
+  let s = '';
+  while (n > 0) {
+    const m = (n - 1) % 26;
+    s = String.fromCharCode(65 + m) + s;
+    n = Math.floor((n - m) / 26);
+  }
+  return s;
+}
+
+// GET /api/export/parties?agent_id=1&cycle_start_year=2026
 router.get('/parties', async (req, res) => {
-  const { agent_id, cycle_start_year } = req.query;
+  const { agent_id, cycle_start_year, agent_display_name } = req.query;
   if (!agent_id) return res.status(400).json({ error: 'agent_id is required' });
+  if (!cycle_start_year) return res.status(400).json({ error: 'cycle_start_year is required' });
 
   const agent = db.data.agents.find(a => a.id === Number(agent_id));
   if (!agent) return res.status(404).json({ error: 'agent not found' });
   const area = db.data.areas.find(a => a.id === agent.area_id);
+  // Display-only label for the sheet (e.g. someone temporarily covering this area).
+  // Never written back to the agent record — `agent.name` in the database is untouched.
+  const displayName = (agent_display_name || '').trim() || agent.name;
 
-  let parties = db.data.parties.filter(p => String(p.agent_id) === String(agent_id));
+  const start = Number(cycle_start_year);
+  const years = [start, start + 1, start + 2];
 
-  let years = [];
-  if (cycle_start_year) {
-    const start = Number(cycle_start_year);
-    years = [start, start + 1, start + 2];
-    parties = parties.filter(p => years.includes(Number(p.year)));
-  }
-  parties = parties.sort((a, b) => (a.year || 0) - (b.year || 0) || a.id - b.id);
+  let parties = db.data.parties.filter(
+    p => String(p.agent_id) === String(agent_id) && Number(p.cycle_start_year) === start
+  );
+  parties = parties.sort((a, b) => (Number(a.s_no) || 0) - (Number(b.s_no) || 0) || a.id - b.id);
 
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Parties');
 
-  sheet.mergeCells(1, 1, 1, 6);
-  sheet.getCell(1, 1).value = `Parties — ${agent.name} (${area?.label || ''})${years.length ? ` — ${years.join('-')}` : ''}`;
+  // 2 (S.N. + Party Name) + 3 cols per year (Sale Details / Sale Return / Net Sale) + 1 (Remark)
+  const totalCols = 2 + years.length * 3 + 1;
+  const cycleLabel = `${years[0]}+${String(years[1]).slice(-2)}+${String(years[2]).slice(-2)}`;
+
+  sheet.mergeCells(1, 1, 1, totalCols);
+  sheet.getCell(1, 1).value = `CHILDREN BOOK PARTY ORDER DETAIL - ${cycleLabel}`;
   sheet.getCell(1, 1).font = { bold: true, size: 13 };
   sheet.getCell(1, 1).alignment = { horizontal: 'center' };
 
-  const headers = ['Year', 'Order No.', 'Party Name', 'Amount Received', 'Amount Return', 'Remaining Amount', 'Remark'];
-  headers.forEach((h, i) => {
-    const c = sheet.getCell(2, i + 1);
-    c.value = h;
-    c.font = { bold: true };
-    c.alignment = { horizontal: 'center' };
-  });
-  sheet.getRow(2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } };
+  sheet.mergeCells(2, 1, 2, totalCols);
+  sheet.getCell(2, 1).value = `Agent Name & Area :- ${displayName} (${area?.label || ''})`;
+  sheet.getCell(2, 1).font = { bold: true, size: 11 };
+  sheet.getCell(2, 1).alignment = { horizontal: 'center' };
 
-  let r = 3;
-  parties.forEach(p => {
-    const received = Number(p.amt_received) || 0;
-    const ret = Number(p.amt_return) || 0;
-    sheet.getCell(r, 1).value = p.year || '';
-    sheet.getCell(r, 2).value = p.order_no || '';
-    sheet.getCell(r, 3).value = p.party_name || '';
-    sheet.getCell(r, 4).value = received;
-    sheet.getCell(r, 5).value = ret;
-    sheet.getCell(r, 6).value = received - ret;
-    sheet.getCell(r, 7).value = p.remark || '';
+  // Two-row header starting at row 3: S.N./Party Name/Remark span both rows,
+  // each year spans 3 columns in row 3 with Sale Details/Sale Return/Net Sale in row 4.
+  const headerRow1 = 3;
+  const headerRow2 = 4;
+
+  sheet.mergeCells(headerRow1, 1, headerRow2, 1);
+  sheet.getCell(headerRow1, 1).value = 'S.N.';
+
+  sheet.mergeCells(headerRow1, 2, headerRow2, 2);
+  sheet.getCell(headerRow1, 2).value = 'PARTY NAME';
+
+  let col = 3;
+  years.forEach(y => {
+    sheet.mergeCells(headerRow1, col, headerRow1, col + 2);
+    sheet.getCell(headerRow1, col).value = y;
+    sheet.getCell(headerRow2, col).value = 'Sale Details';
+    sheet.getCell(headerRow2, col + 1).value = 'Sale Return';
+    sheet.getCell(headerRow2, col + 2).value = 'Net Sale';
+    col += 3;
+  });
+
+  const remarkCol = col;
+  sheet.mergeCells(headerRow1, remarkCol, headerRow2, remarkCol);
+  sheet.getCell(headerRow1, remarkCol).value = 'Remark';
+
+  for (let r = headerRow1; r <= headerRow2; r++) {
+    for (let c = 1; c <= totalCols; c++) {
+      const cell = sheet.getCell(r, c);
+      cell.font = { bold: true };
+      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    }
+    sheet.getRow(r).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } };
+  }
+
+  let r = headerRow2 + 1;
+  const firstDataRow = r;
+  parties.forEach((p, idx) => {
+    sheet.getCell(r, 1).value = p.s_no || idx + 1;
+    sheet.getCell(r, 2).value = p.party_name || '';
+    let c = 3;
+    years.forEach(y => {
+      const details = Number(p[`sale_details_${y}`]) || 0;
+      const ret = Number(p[`sale_return_${y}`]) || 0;
+      sheet.getCell(r, c).value = details;
+      sheet.getCell(r, c + 1).value = ret;
+      sheet.getCell(r, c + 2).value = details - ret;
+      c += 3;
+    });
+    sheet.getCell(r, remarkCol).value = p.remark || '';
     r++;
   });
-
-  const firstDataRow = 3;
   const lastDataRow = r - 1;
 
-  sheet.getCell(r, 3).value = 'TOTAL:-';
-  sheet.getCell(r, 3).font = { bold: true };
+  // NET TOTAL row (matches the reference PDF's bottom "NET TOTAL:-" row)
+  sheet.getCell(r, 2).value = 'NET TOTAL:-';
   if (lastDataRow >= firstDataRow) {
-    ['D', 'E', 'F'].forEach(col => {
-      sheet.getCell(r, col.charCodeAt(0) - 64).value = { formula: `SUM(${col}${firstDataRow}:${col}${lastDataRow})` };
-      sheet.getCell(r, col.charCodeAt(0) - 64).font = { bold: true };
+    let c = 3;
+    years.forEach(() => {
+      for (let i = 0; i < 3; i++) {
+        const colLetter = colToLetter(c + i);
+        sheet.getCell(r, c + i).value = { formula: `SUM(${colLetter}${firstDataRow}:${colLetter}${lastDataRow})` };
+      }
+      c += 3;
     });
   }
+  sheet.getRow(r).font = { bold: true };
+  sheet.getRow(r).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } };
+  const netTotalRow = r;
   r += 2;
 
-  if (years.length) {
-    sheet.getCell(r, 1).value = 'NET TOTAL';
+  // Party-wise Total: same party name can appear on multiple rows (repeat orders),
+  // so group by trimmed/case-insensitive name and sum Sale Details/Return across all 3 years.
+  const partyTotalsMap = {};
+  parties.forEach(p => {
+    const name = (p.party_name || '').trim();
+    if (!name) return;
+    const key = name.toLowerCase();
+    if (!partyTotalsMap[key]) partyTotalsMap[key] = { name, details: 0, ret: 0 };
+    years.forEach(y => {
+      partyTotalsMap[key].details += Number(p[`sale_details_${y}`]) || 0;
+      partyTotalsMap[key].ret += Number(p[`sale_return_${y}`]) || 0;
+    });
+  });
+  const partyTotalsList = Object.values(partyTotalsMap).sort((a, b) => a.name.localeCompare(b.name));
+
+  if (partyTotalsList.length) {
+    sheet.getCell(r, 1).value = 'Party-wise Total';
     sheet.getCell(r, 1).font = { bold: true, size: 12 };
     r++;
-    const sumHeaders = ['Year', 'Amount Received', 'Amount Return', 'Remaining Amount'];
-    sumHeaders.forEach((h, i) => {
-      const c = sheet.getCell(r, i + 1);
-      c.value = h;
-      c.font = { bold: true };
-    });
-    sheet.getRow(r).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } };
+    const ptHeaderRow = r;
+    sheet.getCell(r, 1).value = 'Party Name';
+    sheet.getCell(r, 2).value = 'Sale Details';
+    sheet.getCell(r, 3).value = 'Sale Return';
+    sheet.getCell(r, 4).value = 'Net Sale';
+    for (let c = 1; c <= 4; c++) sheet.getCell(ptHeaderRow, c).font = { bold: true };
+    sheet.getRow(ptHeaderRow).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } };
     r++;
-    years.forEach(y => {
-      const yearRows = parties.filter(p => Number(p.year) === y);
-      const received = yearRows.reduce((s, p) => s + (Number(p.amt_received) || 0), 0);
-      const ret = yearRows.reduce((s, p) => s + (Number(p.amt_return) || 0), 0);
-      sheet.getCell(r, 1).value = y;
-      sheet.getCell(r, 2).value = received;
-      sheet.getCell(r, 3).value = ret;
-      sheet.getCell(r, 4).value = received - ret;
+    partyTotalsList.forEach(pt => {
+      sheet.getCell(r, 1).value = pt.name;
+      sheet.getCell(r, 2).value = pt.details;
+      sheet.getCell(r, 3).value = pt.ret;
+      sheet.getCell(r, 4).value = pt.details - pt.ret;
       r++;
     });
+    for (let row = ptHeaderRow; row < r; row++) {
+      for (let c = 1; c <= 4; c++) {
+        sheet.getCell(row, c).border = {
+          top: { style: 'thin' }, left: { style: 'thin' },
+          bottom: { style: 'thin' }, right: { style: 'thin' },
+        };
+      }
+    }
   }
 
-  sheet.getColumn(1).width = 8;
-  sheet.getColumn(2).width = 14;
-  sheet.getColumn(3).width = 26;
-  sheet.getColumn(4).width = 16;
-  sheet.getColumn(5).width = 16;
-  sheet.getColumn(6).width = 16;
-  sheet.getColumn(7).width = 20;
+  sheet.getColumn(1).width = 6;
+  sheet.getColumn(2).width = 28;
+  for (let c = 3; c < remarkCol; c++) sheet.getColumn(c).width = 13;
+  sheet.getColumn(remarkCol).width = 24;
 
-  for (let row = 1; row <= lastDataRow + 1; row++) {
-    for (let col = 1; col <= 7; col++) {
-      sheet.getCell(row, col).border = {
+  for (let row = 1; row <= netTotalRow; row++) {
+    for (let c = 1; c <= totalCols; c++) {
+      sheet.getCell(row, c).border = {
         top: { style: 'thin' }, left: { style: 'thin' },
         bottom: { style: 'thin' }, right: { style: 'thin' },
       };
     }
   }
 
-  const filename = `Parties_${agent.name.replace(/\s+/g, '_')}${years.length ? '_' + years.join('-') : ''}.xlsx`;
+  const filename = `Parties_${displayName.replace(/\s+/g, '_')}_${years.join('-')}.xlsx`;
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
   await workbook.xlsx.write(res);

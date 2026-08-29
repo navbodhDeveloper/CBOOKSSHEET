@@ -34,7 +34,7 @@
   "agents": [
     {
       "id": 1,
-      "name": "Sanjay Gautam",
+      "name": "ram kumar",
       "area_id": 1,
       "active": 1
     },
@@ -422,7 +422,7 @@
     "schools": 842,
     "order_rows": 108,
     "order_row_years": 186,
-    "parties": 6
+    "parties": 8
   },
   "schools": [
     {
@@ -22502,51 +22502,32 @@
   ],
   "parties": [
     {
-      "id": 1,
-      "agent_id": 1,
-      "order_no": "123as2",
-      "party_name": "Party 1",
-      "amt_received": 10000,
-      "amt_return": 2000,
-      "year": 2026
-    },
-    {
-      "id": 2,
-      "agent_id": 1,
-      "order_no": "234hh12",
-      "party_name": "Party 2",
-      "amt_received": 50000,
-      "amt_return": 1000,
-      "year": 2026
-    },
-    {
-      "id": 3,
-      "agent_id": 1,
-      "order_no": "1234sas4",
-      "party_name": "Party 3",
-      "amt_received": 150000,
-      "amt_return": 20000,
-      "year": 2026
-    },
-    {
-      "id": 4,
+      "id": 7,
       "agent_id": 2,
-      "order_no": "1234aa",
-      "party_name": "Party 1",
-      "amt_received": 10000,
-      "amt_return": 8000,
-      "remark": "Not Getting Response",
-      "year": 2028
+      "cycle_start_year": 2026,
+      "s_no": 1,
+      "party_name": "demo ",
+      "remark": "",
+      "sale_details_2026": 2000,
+      "sale_return_2026": 100,
+      "sale_details_2027": 20000,
+      "sale_return_2027": 1000,
+      "sale_details_2028": 999000,
+      "sale_return_2028": 8000
     },
     {
-      "id": 5,
+      "id": 8,
       "agent_id": 2,
-      "order_no": "2145sa",
-      "party_name": "Party 2",
-      "amt_received": 200000,
-      "amt_return": 50000,
-      "remark": "book nhi mila",
-      "year": 2027
+      "cycle_start_year": 2026,
+      "s_no": 2,
+      "party_name": "ram kumar",
+      "remark": "",
+      "sale_details_2026": 2000,
+      "sale_return_2026": 222,
+      "sale_details_2027": 3300,
+      "sale_return_2027": 33330,
+      "sale_details_2028": 11110,
+      "sale_return_2028": 0
     }
   ]
 }

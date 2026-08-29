@@ -14,6 +14,37 @@ function cellToValue(v) {
   return v;
 }
 
+// Same column order as the export template (server/routes/export-schools.js).
+// null = computed column (Total Spec. Distribute / NET SPE / Net Sale), skipped on import since it's derived.
+const IMPORT_COLUMNS = [
+  'school_code', 'school_name_address', 'principal_name_mobile', 'grade', 'medium', 'board',
+  'specimen_give_month', 'book_delivery_month',
+  'specimen_given_2021', 'specimen_given_ayogya_2021', null, 'specimen_returned_2021', null,
+  'specimen_given_2022', 'specimen_given_ayogya_2022', null, 'specimen_returned_2022', null,
+  'specimen_given_2023', 'specimen_given_ayogya_2023', null, 'specimen_returned_2023', null,
+  'sale_details_2021', 'sale_return_2021', null,
+  'sale_details_2022', 'sale_return_2022', null,
+  'sale_details_2023', 'sale_return_2023', null,
+  'visit_1', 'visit_2', 'visit_3',
+  'supplying_party', 'discussion_2023', 'discussion_2024', 'remark',
+];
+
+// All editable fields
+const FIELDS = [
+  'agent_id',
+  'school_code', 'school_name_address', 'principal_name_mobile',
+  'grade', 'medium', 'board',
+  'specimen_give_month', 'book_delivery_month',
+  'specimen_given_2021', 'specimen_given_ayogya_2021', 'specimen_returned_2021',
+  'specimen_given_2022', 'specimen_given_ayogya_2022', 'specimen_returned_2022',
+  'specimen_given_2023', 'specimen_given_ayogya_2023', 'specimen_returned_2023',
+  'sale_details_2021', 'sale_return_2021',
+  'sale_details_2022', 'sale_return_2022',
+  'sale_details_2023', 'sale_return_2023',
+  'visit_1', 'visit_2', 'visit_3',
+  'supplying_party', 'discussion_2023', 'discussion_2024', 'remark',
+];
+
 function pickFields(body) {
   const out = {};
   for (const f of FIELDS) {
@@ -21,36 +52,6 @@ function pickFields(body) {
   }
   return out;
 }
-
-// Same column order as the export template (server/routes/export-schools.js).
-// null = computed column (NET SPE / NET ORDER / R), skipped on import since it's derived.
-const IMPORT_COLUMNS = [
-  'school_code', 'school_name_address', 'principal_name_mobile', 'grade', 'medium', 'board',
-  'specimen_give_month', 'book_delivery_month',
-  'specimen_given_2021', 'specimen_given_2022', 'specimen_given_2023',
-  'specimen_returned_2021', 'specimen_returned_2022', 'specimen_returned_2023',
-  null, null, null, // 2021/2022/2023 NET SPE (computed)
-  'visit_1', 'visit_2', 'visit_3',
-  'order_2021', 'vapasi_2021', null, 'yog_2021', 'ayog_2021', 'total_2021', null, // 21: Order, Vapasi, Net Order(computed), Y, A, T, R(computed)
-  'order_2022', 'vapasi_2022', null, 'yog_2022', 'ayog_2022', 'total_2022', null,
-  'order_2023', 'vapasi_2023', null, 'yog_2023', 'ayog_2023', 'total_2023', null,
-  'supplying_party', 'discussion_2023', 'discussion_2024', 'remark',
-];
-
-// All editable fields, in the exact original column order
-const FIELDS = [
-  'agent_id',
-  'school_code', 'school_name_address', 'principal_name_mobile',
-  'grade', 'medium', 'board',
-  'specimen_give_month', 'book_delivery_month',
-  'specimen_given_2021', 'specimen_given_2022', 'specimen_given_2023',
-  'specimen_returned_2021', 'specimen_returned_2022', 'specimen_returned_2023',
-  'visit_1', 'visit_2', 'visit_3',
-  'order_2021', 'vapasi_2021', 'yog_2021', 'ayog_2021', 'total_2021',
-  'order_2022', 'vapasi_2022', 'yog_2022', 'ayog_2022', 'total_2022',
-  'order_2023', 'vapasi_2023', 'yog_2023', 'ayog_2023', 'total_2023',
-  'supplying_party', 'discussion_2023', 'discussion_2024', 'remark',
-];
 
 // Same School Code + School Name/Address already exists anywhere in this list
 // (Master/New/CBSE), regardless of which agent owns it.
