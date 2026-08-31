@@ -9,6 +9,8 @@ const LIST_TABS = [
 
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 
+const COLUMN_VISIBILITY_KEY = 'schoolMasterList.visibleColumns';
+
 // Field/label pairs, in the exact sequence from the reference sheet.
 // specimen_given_2021/22/23 = "Specimen Given Yogya" (reused from before so existing data carries over)
 const COLUMNS = [
@@ -118,6 +120,66 @@ export default function SchoolModule({ setStatus }) {
   const [areas, setAreas] = useState([]);
   const [selectedAreaId, setSelectedAreaId] = useState('');
   const [agents, setAgents] = useState([]);
+
+  // Which data columns are shown, keyed by field name (S.N. and the delete/action
+  // column are structural and always shown, not toggleable). Restored from
+  // localStorage so the choice persists across visits; defaults to "all visible".
+  const [visibleColumns, setVisibleColumns] = useState(() => {
+    try {
+      const saved = window.localStorage.getItem(COLUMN_VISIBILITY_KEY);
+      if (saved) {
+        const savedFields = new Set(JSON.parse(saved));
+        // Guard against a stale saved list missing newer columns — anything not
+        // present in the saved list yet still stays hidden only if it WAS present
+        // and unchecked; brand-new fields default to visible.
+        return new Set(COLUMNS.map(([field]) => field).filter(field => savedFields.has(field)));
+      }
+    } catch {
+      // ignore malformed/missing localStorage data and fall back to defaults
+    }
+    return new Set(COLUMNS.map(([field]) => field));
+  });
+  const [showColumnPicker, setShowColumnPicker] = useState(false);
+  const columnPickerRef = useRef(null);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(COLUMN_VISIBILITY_KEY, JSON.stringify([...visibleColumns]));
+    } catch {
+      // localStorage may be unavailable (private browsing etc.) — fine to skip persisting
+    }
+  }, [visibleColumns]);
+
+  // Close the column picker when clicking anywhere outside it.
+  useEffect(() => {
+    if (!showColumnPicker) return;
+    function handleClickOutside(e) {
+      if (columnPickerRef.current && !columnPickerRef.current.contains(e.target)) {
+        setShowColumnPicker(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showColumnPicker]);
+
+  function toggleColumn(field) {
+    setVisibleColumns(prev => {
+      const next = new Set(prev);
+      if (next.has(field)) next.delete(field);
+      else next.add(field);
+      return next;
+    });
+  }
+
+  function selectAllColumns() {
+    setVisibleColumns(new Set(COLUMNS.map(([field]) => field)));
+  }
+
+  function clearAllColumns() {
+    setVisibleColumns(new Set());
+  }
+
+  const displayColumns = COLUMNS.filter(([field]) => visibleColumns.has(field));
 
   useEffect(() => {
     (async () => {
@@ -267,6 +329,16 @@ export default function SchoolModule({ setStatus }) {
   function doExport() {
     const qs = new URLSearchParams({ list_type: listType });
     if (selectedAgentId) qs.set('agent_id', selectedAgentId);
+    // Only the checked columns are included, in the fixed canonical order (not the
+    // order they were checked). A partial export is fine for viewing/printing/sharing,
+    // but is NOT safe to re-import — Import expects every column in its fixed position.
+    qs.set('fields', displayColumns.map(([field]) => field).join(','));
+    if (displayColumns.length < COLUMNS.length) {
+      const proceed = window.confirm(
+        `You're exporting ${displayColumns.length} of ${COLUMNS.length} columns. This file is fine for viewing or printing, but it should NOT be used with "Import from Excel" later — only a full export (Select All) is safe to re-import.\n\nContinue with this partial export?`
+      );
+      if (!proceed) return;
+    }
     window.location.href = `${API_BASE}/api/export/school-list?${qs.toString()}`;
   }
 
@@ -377,6 +449,36 @@ export default function SchoolModule({ setStatus }) {
         />
         <button className="secondary" onClick={doExport}>⬇ Export to Excel</button>
         <button className="secondary" onClick={handleDedupe}>🧹 Clean Duplicates</button>
+        <div className="field" style={{ position: 'relative' }} ref={columnPickerRef}>
+          <button className="secondary" onClick={() => setShowColumnPicker(v => !v)}>
+            ☑ Columns ({displayColumns.length}/{COLUMNS.length})
+          </button>
+          {showColumnPicker && (
+            <div
+              style={{
+                position: 'absolute', top: '100%', left: 0, zIndex: 20,
+                background: '#fff', border: '1px solid #ccc', borderRadius: 4,
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15)', padding: 10,
+                width: 320, maxHeight: 420, overflowY: 'auto', marginTop: 4,
+              }}
+            >
+              <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                <button className="secondary" type="button" onClick={selectAllColumns}>Select All</button>
+                <button className="secondary" type="button" onClick={clearAllColumns}>Clear All</button>
+              </div>
+              {COLUMNS.map(([field, label]) => (
+                <label key={field} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0', fontSize: 13, cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={visibleColumns.has(field)}
+                    onChange={() => toggleColumn(field)}
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
         <span className="status">
           {loading ? 'Loading...' : `${filtered.length} schools`}
           {duplicateIds.size > 0 && <span style={{ color: '#b00020', fontWeight: 'bold' }}> — {duplicateIds.size} duplicate rows highlighted in red</span>}
@@ -389,7 +491,7 @@ export default function SchoolModule({ setStatus }) {
             <thead>
               <tr>
                 <th>S.N.</th>
-                {COLUMNS.map(([field, label]) => <th key={field}>{label}</th>)}
+                {displayColumns.map(([field, label]) => <th key={field}>{label}</th>)}
                 <th></th>
               </tr>
             </thead>
@@ -400,6 +502,7 @@ export default function SchoolModule({ setStatus }) {
                   school={school}
                   index={pageStart + idx}
                   rowIndex={idx}
+                  columns={displayColumns}
                   updateLocal={updateLocal}
                   queueSave={queueSave}
                   onDelete={() => deleteSchool(school.id)}
@@ -412,7 +515,7 @@ export default function SchoolModule({ setStatus }) {
             <tfoot>
               <tr>
                 <td>TOTAL:-</td>
-                {COLUMNS.map(([field]) => (
+                {displayColumns.map(([field]) => (
                   <td key={field}>{totals[field] !== undefined ? totals[field] : ''}</td>
                 ))}
                 <td></td>
@@ -433,7 +536,7 @@ export default function SchoolModule({ setStatus }) {
   );
 }
 
-function SchoolRow({ school, index, rowIndex, updateLocal, queueSave, onDelete, isDuplicate, setCellRef, handleCellKeyDown }) {
+function SchoolRow({ school, index, rowIndex, columns, updateLocal, queueSave, onDelete, isDuplicate, setCellRef, handleCellKeyDown }) {
   function handleChange(field, value) {
     updateLocal(school.id, field, value);
     queueSave(school.id);
@@ -442,7 +545,7 @@ function SchoolRow({ school, index, rowIndex, updateLocal, queueSave, onDelete, 
   return (
     <tr className={isDuplicate ? 'duplicate-row' : ''}>
       <td>{index + 1}</td>
-      {COLUMNS.map(([field], colIndex) => (
+      {columns.map(([field], colIndex) => (
         <td key={field} className={TEXTAREA_FIELDS.has(field) ? 'text-left' : ''}>
           {COMPUTED[field] ? (
             <span className="computed-cell">{COMPUTED[field](school)}</span>
