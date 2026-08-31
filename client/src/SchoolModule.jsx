@@ -103,6 +103,15 @@ export default function SchoolModule({ setStatus }) {
   const saveTimers = useRef({});
   const fileInputRef = useRef(null);
   const cellRefs = useRef(new Map());
+  // Always holds the CURRENT schools array. saveSchool reads from this ref (not a
+  // closure over `schools`) so a debounced save firing 400ms later always picks up
+  // every keystroke typed in the meantime, instead of overwriting them with whatever
+  // was in state when the save was first scheduled. Without this, the very first
+  // character typed into a brand-new row could get silently wiped out when the
+  // debounced save fired with stale (empty) data and replaced the row with the
+  // server's response.
+  const schoolsRef = useRef(schools);
+  useEffect(() => { schoolsRef.current = schools; }, [schools]);
 
   const [states, setStates] = useState(['MP', 'CG']);
   const [selectedState, setSelectedState] = useState('MP');
@@ -208,13 +217,11 @@ export default function SchoolModule({ setStatus }) {
     }
   }
 
-  function queueSave(id) {
-    clearTimeout(saveTimers.current[id]);
-    saveTimers.current[id] = setTimeout(() => saveSchool(id), 400);
-  }
-
-  async function saveSchool(id) {
-    const school = schools.find(s => s.id === id);
+  // Reads from schoolsRef.current (always fresh) rather than closing over the
+  // `schools` state variable, so this always saves whatever was most recently typed —
+  // even if this exact function instance was scheduled several keystrokes ago.
+  const saveSchool = useCallback(async (id) => {
+    const school = schoolsRef.current.find(s => s.id === id);
     if (!school) return;
     try {
       if (String(id).startsWith('new-')) {
@@ -229,7 +236,12 @@ export default function SchoolModule({ setStatus }) {
       setStatus(err.message, true);
       window.alert(err.message);
     }
-  }
+  }, [listType, setStatus]);
+
+  const queueSave = useCallback((id) => {
+    clearTimeout(saveTimers.current[id]);
+    saveTimers.current[id] = setTimeout(() => saveSchool(id), 400);
+  }, [saveSchool]);
 
   function addBlankSchool() {
     const tempId = `new-${Date.now()}`;
