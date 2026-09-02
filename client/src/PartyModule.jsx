@@ -98,6 +98,29 @@ export default function PartyModule({ setStatus }) {
     return years.some(y => (Number(row[`sale_details_${y}`]) || 0) !== 0 || (Number(row[`sale_return_${y}`]) || 0) !== 0);
   }
 
+  const sortByName = useCallback(async () => {
+    const sorted = [...parties].sort((a, b) => (a.party_name || '').localeCompare(b.party_name || '', undefined, { sensitivity: 'base' }));
+    setParties(sorted);
+    try {
+      for (let i = 0; i < sorted.length; i++) {
+        const row = sorted[i];
+        if (!row.id) continue;
+        const payload = {
+          agent_id: selectedAgentId, cycle_start_year: selectedCycle,
+          s_no: i + 1, party_name: row.party_name, remark: row.remark,
+        };
+        years.forEach(y => {
+          payload[`sale_details_${y}`] = Number(row[`sale_details_${y}`]) || 0;
+          payload[`sale_return_${y}`] = Number(row[`sale_return_${y}`]) || 0;
+        });
+        await api(`/parties/${row.id}`, { method: 'PUT', body: JSON.stringify(payload) });
+      }
+      setStatus('Sorted by Party Name');
+    } catch (err) {
+      setStatus(err.message, true);
+    }
+  }, [parties, selectedAgentId, selectedCycle, years, setStatus]);
+
   function addBlankRow() {
     if (!selectedAgentId || !selectedCycle) { setStatus('Load a sheet first', true); return false; }
     if (parties.length > 0 && !rowHasData(parties[parties.length - 1])) {
@@ -276,6 +299,7 @@ export default function PartyModule({ setStatus }) {
         </div>
         <button onClick={loadSheet}>Load Sheet</button>
         <button onClick={addBlankRow} disabled={!loaded}>+ Add Row</button>
+        <button className="secondary" disabled={!loaded} onClick={sortByName}>⇅ Sort by Name</button>
         <button className="secondary" disabled={!loaded} onClick={doExport}>⬇ Export to Excel</button>
       </section>
 
@@ -287,7 +311,7 @@ export default function PartyModule({ setStatus }) {
                 <thead>
                   <tr>
                     <th rowSpan={2}>S.N.</th>
-                    <th rowSpan={2}>Party Name</th>
+                    <th rowSpan={2} style={{ minWidth: 220 }}>Party Name</th>
                     {years.map(y => <th key={y} colSpan={3}>{y}</th>)}
                     <th rowSpan={2}>Remark</th>
                     <th rowSpan={2}></th>
@@ -297,7 +321,7 @@ export default function PartyModule({ setStatus }) {
                       <Fragment key={y}>
                         <th>Sale Details</th>
                         <th>Sale Return</th>
-                        <th>Net Sale</th>
+                        <th style={{ minWidth: 110, fontSize: '1.05em' }}>Net Sale</th>
                       </Fragment>
                     ))}
                   </tr>
@@ -310,9 +334,10 @@ export default function PartyModule({ setStatus }) {
                           duplicated/out of sequence. */}
                       <td>{idx + 1}</td>
                       <td className="text-left">
-                        <input
+                        <textarea
                           ref={setCellRef(idx, 1)}
-                          type="text" value={row.party_name || ''}
+                          rows={2} style={{ width: '100%', minWidth: 200, resize: 'vertical' }}
+                          value={row.party_name || ''}
                           onChange={(e) => updateLocal(idx, 'party_name', e.target.value)}
                           onKeyDown={(e) => handleKeyDown(e, idx, 1)}
                           onBlur={() => saveRow(idx)} />
@@ -343,7 +368,9 @@ export default function PartyModule({ setStatus }) {
                                 onKeyDown={(e) => handleKeyDown(e, idx, rCol)}
                                 onBlur={() => saveRow(idx)} />
                             </td>
-                            <td><span className="computed-cell">{net}</span></td>
+                            <td style={{ minWidth: 110 }}>
+                              <span className="computed-cell" style={{ fontSize: '1.1em', fontWeight: 'bold' }}>{net}</span>
+                            </td>
                           </Fragment>
                         );
                       })}

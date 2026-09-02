@@ -45,9 +45,48 @@ export default function Grid({ rows, setRows, agentId, year, setStatus }) {
     if (el) el.focus();
   };
 
+  const sortByDate = useCallback(async () => {
+    const parseDate = (d) => {
+      if (!d) return Infinity;
+      const t = new Date(d).getTime();
+      return Number.isNaN(t) ? Infinity : t;
+    };
+    const sorted = [...rows].sort((a, b) => parseDate(a.challan?.challan_date) - parseDate(b.challan?.challan_date));
+    setRows(sorted);
+    try {
+      for (let i = 0; i < sorted.length; i++) {
+        const row = sorted[i];
+        if (row.challan?.id) await api(`/challans/${row.challan.id}`, { method: 'PUT', body: JSON.stringify({ ...row.challan, s_no: i + 1 }) });
+        if (row.ret?.id) await api(`/challans/returns/${row.ret.id}`, { method: 'PUT', body: JSON.stringify({ ...row.ret, s_no: i + 1 }) });
+      }
+      setStatus('Sorted by date');
+    } catch (err) {
+      setStatus(err.message, true);
+    }
+  }, [rows, setRows, setStatus]);
+
+  // Checks the DOM directly (not just saved row state) since inputs here are
+  // uncontrolled — the user may have typed something but not yet blurred/saved it.
+  function lastRowHasData(rowIndex) {
+    for (let c = 1; c <= 7; c++) {
+      const el = refsMap.current.get(`${rowIndex}-${c}`);
+      if (el && el.value && el.value.trim() !== '') return true;
+    }
+    return false;
+  }
+
   const addBlankRow = useCallback(() => {
+    if (rows.length > 0) {
+      const lastIdx = rows.length - 1;
+      const lastRow = rows[lastIdx];
+      if (!(lastRow.challan || lastRow.ret) && !lastRowHasData(lastIdx)) {
+        setStatus('Please fill in the current row before adding a new one', true);
+        return false;
+      }
+    }
     setRows(prev => [...prev, { rowKey: `row-new-${Date.now()}-${Math.random()}`, challan: null, ret: null }]);
-  }, [setRows]);
+    return true;
+  }, [rows, setRows, setStatus]);
 
   const deleteRow = useCallback(async (rowIndex) => {
     const row = rows[rowIndex];
@@ -68,8 +107,8 @@ export default function Grid({ rows, setRows, agentId, year, setStatus }) {
     if (e.key === 'Enter' || e.key === 'ArrowDown') {
       e.preventDefault();
       if (rowIndex === rows.length - 1) {
-        addBlankRow();
-        setTimeout(() => focusCell(rowIndex + 1, colIndex), 0);
+        const added = addBlankRow();
+        if (added) setTimeout(() => focusCell(rowIndex + 1, colIndex), 0);
       } else {
         focusCell(rowIndex + 1, colIndex);
       }
@@ -244,7 +283,8 @@ export default function Grid({ rows, setRows, agentId, year, setStatus }) {
         </table>
       </div>
       <div className="row-actions">
-        <button onClick={() => { addBlankRow(); setTimeout(() => focusCell(rows.length, 1), 0); }}>+ Add Row</button>
+        <button onClick={() => { if (addBlankRow()) setTimeout(() => focusCell(rows.length, 1), 0); }}>+ Add Row</button>
+        <button className="secondary" onClick={sortByDate}>⇅ Sort by Date</button>
       </div>
     </div>
   );

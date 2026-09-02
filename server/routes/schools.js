@@ -171,6 +171,8 @@ router.post('/import', async (req, res) => {
 });
 
 // POST /api/schools/dedupe?list_type=MASTER
+// Removes: (1) rows with no School Code AND no School Name/Address — empty filler
+// rows, not real data; (2) duplicate School Code + Name pairs, keeping the first.
 router.post('/dedupe', async (req, res) => {
   const { list_type } = req.body;
   if (!list_type) return res.status(400).json({ error: 'list_type is required' });
@@ -179,8 +181,15 @@ router.post('/dedupe', async (req, res) => {
   const toRemove = [];
   for (const s of db.data.schools) {
     if (s.list_type !== list_type) continue;
-    const key = `${(s.school_code || '').trim().toLowerCase()}|${(s.school_name_address || '').trim().toLowerCase()}`;
-    if (!key.trim() || key === '|') continue;
+    const code = (s.school_code || '').trim().toLowerCase();
+    const name = (s.school_name_address || '').trim().toLowerCase();
+
+    if (!code && !name) {
+      toRemove.push(s.id);
+      continue;
+    }
+
+    const key = `${code}|${name}`;
     if (seen.has(key)) {
       toRemove.push(s.id);
     } else {

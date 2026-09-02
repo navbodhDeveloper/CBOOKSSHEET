@@ -374,7 +374,7 @@ export default function SchoolModule({ setStatus }) {
   }
 
   async function handleDedupe() {
-    if (!window.confirm(`Remove duplicate schools from "${listType}"? This keeps the first copy of each and deletes the rest. This cannot be undone.`)) return;
+    if (!window.confirm(`Remove duplicate and completely empty rows from "${listType}"? This keeps the first copy of each duplicate and deletes the rest, plus any row with no School Code and no School Name/Address. This cannot be undone.`)) return;
     try {
       const result = await api('/schools/dedupe', { method: 'POST', body: JSON.stringify({ list_type: listType }) });
       setStatus(`Removed ${result.removed} duplicate rows`);
@@ -383,6 +383,13 @@ export default function SchoolModule({ setStatus }) {
       setStatus(err.message, true);
       window.alert(err.message);
     }
+  }
+
+  function sortByName() {
+    setSchools(prev => [...prev].sort((a, b) =>
+      (a.school_name_address || '').localeCompare(b.school_name_address || '', undefined, { sensitivity: 'base' })
+    ));
+    setPage(1);
   }
 
   return (
@@ -449,6 +456,7 @@ export default function SchoolModule({ setStatus }) {
         />
         <button className="secondary" onClick={doExport}>⬇ Export to Excel</button>
         <button className="secondary" onClick={handleDedupe}>🧹 Clean Duplicates</button>
+        <button className="secondary" onClick={sortByName}>⇅ Sort by School Name</button>
         <div className="field" style={{ position: 'relative' }} ref={columnPickerRef}>
           <button className="secondary" onClick={() => setShowColumnPicker(v => !v)}>
             ☑ Columns ({displayColumns.length}/{COLUMNS.length})
