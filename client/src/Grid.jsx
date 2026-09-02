@@ -284,7 +284,7 @@ export default function Grid({ rows, setRows, agentId, year, setStatus }) {
       </div>
       <div className="row-actions">
         <button onClick={() => { if (addBlankRow()) setTimeout(() => focusCell(rows.length, 1), 0); }}>+ Add Row</button>
-        <button className="secondary" onClick={sortByDate}>⇅ Sort by Date</button>
+        <button className="secondary" onClick={sortByDate} style={{margin:"20px"}}>⇅ Sort by Date</button>
       </div>
     </div>
   );
