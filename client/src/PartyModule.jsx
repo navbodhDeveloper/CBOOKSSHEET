@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, useRef, Fragment } from 'react';
 import { api, API_BASE } from './api';
 
 // Each row = one Party spanning a 3-year cycle.
-// Column order for keyboard navigation: S.No.(0) Party Name(1)
+// S.N. is auto-computed from row position (not a stored/editable field — see render below).
+// Column order for keyboard navigation: Party Name(1)
 // then per year: Sale Details, Sale Return (Net Sale is computed, not focusable)
 // then Remark last.
 export default function PartyModule({ setStatus }) {
@@ -87,13 +88,26 @@ export default function PartyModule({ setStatus }) {
     load(selectedAgentId, cycleStartYear);
   }
 
+  // A row counts as "started" if it has a Party Name, a Remark, or any non-zero
+  // Sale Details/Sale Return figure in any year of the current cycle. Used to stop
+  // the user from stacking up empty blank rows before finishing the current one.
+  function rowHasData(row) {
+    if (!row) return false;
+    if ((row.party_name || '').trim()) return true;
+    if ((row.remark || '').trim()) return true;
+    return years.some(y => (Number(row[`sale_details_${y}`]) || 0) !== 0 || (Number(row[`sale_return_${y}`]) || 0) !== 0);
+  }
+
   function addBlankRow() {
-    if (!selectedAgentId || !selectedCycle) { setStatus('Load a sheet first', true); return; }
+    if (!selectedAgentId || !selectedCycle) { setStatus('Load a sheet first', true); return false; }
+    if (parties.length > 0 && !rowHasData(parties[parties.length - 1])) {
+      setStatus('Please fill in the current row (Party Name or an amount) before adding a new one', true);
+      return false;
+    }
     const blank = {
       rowKey: `new-${Date.now()}`,
       agent_id: selectedAgentId,
       cycle_start_year: selectedCycle,
-      s_no: parties.length + 1,
       party_name: '',
       remark: '',
     };
@@ -102,6 +116,7 @@ export default function PartyModule({ setStatus }) {
       blank[`sale_return_${y}`] = '';
     });
     setParties(prev => [...prev, blank]);
+    return true;
   }
 
   const setCellRef = (rowIndex, colIndex) => (el) => {
@@ -115,13 +130,14 @@ export default function PartyModule({ setStatus }) {
     if (el) el.focus();
   }
 
-  // Enter moves down to the next row's same field, auto-creating a new row if you're on the last one.
+  // Enter moves down to the next row's same field, auto-creating a new row if you're on
+  // the last one — but only if that last row already has something in it.
   function handleKeyDown(e, rowIndex, colIndex) {
     if (e.key === 'Enter' || e.key === 'ArrowDown') {
       e.preventDefault();
       if (rowIndex === parties.length - 1) {
-        addBlankRow();
-        setTimeout(() => focusCell(rowIndex + 1, colIndex), 0);
+        const added = addBlankRow();
+        if (added) setTimeout(() => focusCell(rowIndex + 1, colIndex), 0);
       } else {
         focusCell(rowIndex + 1, colIndex);
       }
@@ -140,7 +156,9 @@ export default function PartyModule({ setStatus }) {
     const payload = {
       agent_id: selectedAgentId,
       cycle_start_year: selectedCycle,
-      s_no: Number(row.s_no) || undefined,
+      // S.N. is always the row's position on the sheet — never typed, never stored as a
+      // separate editable value, so it can't go out of sequence or duplicate.
+      s_no: idx + 1,
       party_name: row.party_name,
       remark: row.remark,
     };
@@ -287,14 +305,10 @@ export default function PartyModule({ setStatus }) {
                 <tbody>
                   {parties.map((row, idx) => (
                     <tr key={row.rowKey || row.id}>
-                      <td>
-                        <input
-                          ref={setCellRef(idx, 0)}
-                          type="text" inputMode="numeric" value={row.s_no ?? ''}
-                          onChange={(e) => updateLocal(idx, 's_no', e.target.value.replace(/[^0-9]/g, ''))}
-                          onKeyDown={(e) => handleKeyDown(e, idx, 0)}
-                          onBlur={() => saveRow(idx)} />
-                      </td>
+                      {/* S.N. is always the row's position on the sheet — plain display,
+                          not an input, so it can never be typed differently or end up
+                          duplicated/out of sequence. */}
+                      <td>{idx + 1}</td>
                       <td className="text-left">
                         <input
                           ref={setCellRef(idx, 1)}

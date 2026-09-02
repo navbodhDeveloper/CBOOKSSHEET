@@ -48,16 +48,22 @@ router.get('/states', (req, res) => {
   res.json([...states].sort());
 });
 
-// Shared logic: find-or-create a region+area from (state, region_name, area_code)
+// Shared logic: find-or-create a region+area from (state, region_name, area_code).
+//
+// IMPORTANT: a region is identified by (name + state) together, NEVER by name alone.
+// Region names like "Ambikapur", "Bilaspur", "Durg" etc. must be able to coexist
+// independently per state without ever being confused for one another. This function
+// also NEVER rewrites an existing region's state as a side effect of creating or
+// editing an agent — a region, once created with a given state, keeps that state
+// unless someone explicitly renames/moves it through a dedicated action (there isn't
+// one right now; add one deliberately if that's ever actually needed, rather than
+// letting it happen implicitly here).
 function resolveArea({ state, region_name, area_code }) {
-  let region = db.data.regions.find(r => r.name === region_name);
+  const targetState = state || 'MP';
+  let region = db.data.regions.find(r => r.name === region_name && (r.state || 'MP') === targetState);
   if (!region) {
-    region = { id: nextId('regions'), name: region_name, state: state || 'MP' };
+    region = { id: nextId('regions'), name: region_name, state: targetState };
     db.data.regions.push(region);
-  } else if (state && !region.state) {
-    region.state = state;
-  } else if (state) {
-    region.state = state; // allow moving a region's state on edit
   }
   let area = db.data.areas.find(a => a.region_id === region.id && a.code === area_code);
   if (!area) {

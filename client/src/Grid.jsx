@@ -1,13 +1,38 @@
 import { useRef, useCallback } from 'react';
 import { api } from './api';
 
-// Column layout: S.N.(0) Date(1) Challan No.(2) Total Books(3) | Return Date(4) Return Challan No.(5) Return Qty(6) Remark(7)
+// Column layout: S.N. is auto-computed from row position (not a stored/editable field —
+// see Row below), then Date(1) Challan No.(2) Total Books(3) | Return Date(4) Return
+// Challan No.(5) Return Qty(6) Remark(7). Column indices for inputs/refs/keyboard-nav
+// stay numbered this way (starting at 1) to avoid renumbering everything else.
 const COL_COUNT = 8;
+
+// A row is flagged as a duplicate if its Challan No. matches another row's. S.N. can no
+// longer duplicate since it's always auto-computed from row position — see Row below —
+// so it's not part of this check anymore.
+function computeDuplicateFlags(rows) {
+  const challanNoCounts = new Map();
+
+  rows.forEach(row => {
+    const cn = (row.challan?.challan_no || '').trim().toLowerCase();
+    if (cn) {
+      challanNoCounts.set(cn, (challanNoCounts.get(cn) || 0) + 1);
+    }
+  });
+
+  return rows.map(row => {
+    const cn = (row.challan?.challan_no || '').trim().toLowerCase();
+    return cn && challanNoCounts.get(cn) > 1;
+  });
+}
 
 export default function Grid({ rows, setRows, agentId, year, setStatus }) {
   // refs[rowIndex][colIndex] -> input DOM element
   const refsMap = useRef(new Map());
   const saveQueue = useRef(Promise.resolve());
+
+  const duplicateFlags = computeDuplicateFlags(rows);
+  const duplicateCount = duplicateFlags.filter(Boolean).length;
 
   const setInputRef = (rowIndex, colIndex) => (el) => {
     const key = `${rowIndex}-${colIndex}`;
@@ -62,7 +87,6 @@ export default function Grid({ rows, setRows, agentId, year, setStatus }) {
 
   function fieldColIndex(section, field) {
     if (section === 'challan') {
-      if (field === 's_no') return 0;
       if (field === 'challan_date') return 1;
       if (field === 'challan_no') return 2;
       if (field === 'total_books') return 3;
@@ -86,15 +110,29 @@ export default function Grid({ rows, setRows, agentId, year, setStatus }) {
     if (section === 'challan') {
       const challan_date = getVal('challan_date');
       const challan_no = getVal('challan_no');
-      const s_no = getVal('s_no');
       const total_books = getVal('total_books');
       const hasAnyData = challan_date || challan_no || total_books;
       if (!hasAnyData) return;
       if (!challan_date || !challan_no) return;
 
+      // Block duplicate Challan No. — check against every OTHER row currently on the
+      // sheet (case-insensitive, trimmed). If it matches, reject the save, revert the
+      // field to whatever was last saved for this row, and tell the user why.
+      const normalized = challan_no.trim().toLowerCase();
+      const dupRowIndex = rows.findIndex((r, i) => i !== rowIndex && (r.challan?.challan_no || '').trim().toLowerCase() === normalized);
+      if (dupRowIndex !== -1) {
+        const el = refsMap.current.get(`${rowIndex}-2`);
+        if (el) el.value = row.challan?.challan_no || '';
+        setStatus(`Duplicate Challan No. "${challan_no}" — not saved`, true);
+        window.alert(`Challan No. "${challan_no}" is already used in row ${dupRowIndex + 1}. Please use a different Challan No. — this entry was not saved.`);
+        return;
+      }
+
+      // S.N. is always the row's position — never typed, never stored as a separate
+      // editable value, so it can never go out of sequence or duplicate.
       const payload = {
         agent_id: agentId, year,
-        s_no: s_no ? Number(s_no) : null, challan_date, challan_no,
+        s_no: rowIndex + 1, challan_date, challan_no,
         total_books: total_books ? Number(total_books) : 0,
         items: [],
       };
@@ -154,6 +192,11 @@ export default function Grid({ rows, setRows, agentId, year, setStatus }) {
 
   return (
     <div id="sheetWrap">
+      {duplicateCount > 0 && (
+        <div style={{ marginBottom: 8, color: '#b00020', fontWeight: 'bold' }}>
+          ⚠ {duplicateCount} duplicate row{duplicateCount > 1 ? 's' : ''} highlighted in red — matching Challan No. found
+        </div>
+      )}
       <div className="table-scroll">
         <table className="grid">
           <thead>
@@ -183,6 +226,7 @@ export default function Grid({ rows, setRows, agentId, year, setStatus }) {
                 handleKeyDown={handleKeyDown}
                 queueSave={queueSave}
                 onDelete={() => deleteRow(rIdx)}
+                isDuplicate={duplicateFlags[rIdx]}
               />
             ))}
           </tbody>
@@ -200,13 +244,13 @@ export default function Grid({ rows, setRows, agentId, year, setStatus }) {
         </table>
       </div>
       <div className="row-actions">
-        <button onClick={() => { addBlankRow(); setTimeout(() => focusCell(rows.length, 0), 0); }}>+ Add Row</button>
+        <button onClick={() => { addBlankRow(); setTimeout(() => focusCell(rows.length, 1), 0); }}>+ Add Row</button>
       </div>
     </div>
   );
 }
 
-function Row({ row, rowIndex, setInputRef, handleKeyDown, queueSave, onDelete }) {
+function Row({ row, rowIndex, setInputRef, handleKeyDown, queueSave, onDelete, isDuplicate }) {
   const numInput = (defaultValue, section, colIndex, extraClass = '') => {
     const c = colIndex;
     return (
@@ -256,7 +300,9 @@ function Row({ row, rowIndex, setInputRef, handleKeyDown, queueSave, onDelete })
   };
 
   const cells = [
-    numInput(row.challan?.s_no ?? rowIndex + 1, 'challan', 0),
+    // S.N. is always the row's position on the sheet — plain display, not an input, so
+    // it can never be typed differently or end up duplicated/out of sequence.
+    <td key="sn">{rowIndex + 1}</td>,
     dateInput(row.challan?.challan_date ?? '', 'challan', 1),
     textInput(row.challan?.challan_no ?? '', 'challan', 2),
     numInput(row.challan?.total_books ?? '', 'challan', 3),
@@ -269,5 +315,5 @@ function Row({ row, rowIndex, setInputRef, handleKeyDown, queueSave, onDelete })
     </td>,
   ];
 
-  return <tr>{cells}</tr>;
+  return <tr className={isDuplicate ? 'duplicate-row' : ''}>{cells}</tr>;
 }

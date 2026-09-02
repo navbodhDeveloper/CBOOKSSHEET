@@ -9,6 +9,11 @@
       "id": 2,
       "name": "Bhopal",
       "state": "MP"
+    },
+    {
+      "id": 3,
+      "name": "Durg",
+      "state": "CG"
     }
   ],
   "areas": [
@@ -29,6 +34,12 @@
       "region_id": 1,
       "code": "ABC",
       "label": "Jabalpur - ABC"
+    },
+    {
+      "id": 4,
+      "region_id": 3,
+      "code": "A",
+      "label": "Durg - A"
     }
   ],
   "agents": [
@@ -48,6 +59,12 @@
       "id": 3,
       "name": "Agent1",
       "area_id": 3,
+      "active": 1
+    },
+    {
+      "id": 4,
+      "name": "Demo Agent",
+      "area_id": 4,
       "active": 1
     }
   ],
@@ -358,6 +375,26 @@
       "challan_no": "2345",
       "total_books": 800,
       "items": []
+    },
+    {
+      "id": 8,
+      "agent_id": 4,
+      "year": 2026,
+      "s_no": 1,
+      "challan_date": "2026-09-01",
+      "challan_no": "12345",
+      "total_books": 5000,
+      "items": []
+    },
+    {
+      "id": 9,
+      "agent_id": 4,
+      "year": 2026,
+      "s_no": 2,
+      "challan_date": "2026-09-02",
+      "challan_no": "23651",
+      "total_books": 5000,
+      "items": []
     }
   ],
   "returns": [
@@ -410,19 +447,29 @@
       "challan_no": "2345",
       "books_qty": 500,
       "remark": null
+    },
+    {
+      "id": 7,
+      "agent_id": 4,
+      "year": 2026,
+      "s_no": 1,
+      "return_date": "2026-09-03",
+      "challan_no": "500",
+      "books_qty": 450,
+      "remark": null
     }
   ],
   "_seq": {
-    "regions": 2,
-    "areas": 3,
-    "agents": 3,
+    "regions": 3,
+    "areas": 4,
+    "agents": 4,
     "book_types": 14,
-    "challans": 7,
-    "returns": 6,
+    "challans": 9,
+    "returns": 7,
     "schools": 843,
     "order_rows": 108,
     "order_row_years": 186,
-    "parties": 8
+    "parties": 16
   },
   "schools": [
     {
@@ -22493,6 +22540,48 @@
       "sale_return_2027": 33330,
       "sale_details_2028": 11110,
       "sale_return_2028": 0
+    },
+    {
+      "id": 9,
+      "agent_id": 4,
+      "cycle_start_year": 2024,
+      "s_no": 1,
+      "party_name": "Ram Ji ",
+      "remark": "",
+      "sale_details_2024": 5000,
+      "sale_return_2024": 12000,
+      "sale_details_2025": 50000,
+      "sale_return_2025": 2000,
+      "sale_details_2026": 45000,
+      "sale_return_2026": 3000
+    },
+    {
+      "id": 15,
+      "agent_id": 4,
+      "cycle_start_year": 2024,
+      "s_no": 2,
+      "party_name": "",
+      "remark": "",
+      "sale_details_2024": 0,
+      "sale_return_2024": 0,
+      "sale_details_2025": 0,
+      "sale_return_2025": 0,
+      "sale_details_2026": 0,
+      "sale_return_2026": 0
+    },
+    {
+      "id": 16,
+      "agent_id": 4,
+      "cycle_start_year": 2024,
+      "s_no": 3,
+      "party_name": "jdasd",
+      "remark": "",
+      "sale_details_2024": 0,
+      "sale_return_2024": 0,
+      "sale_details_2025": 0,
+      "sale_return_2025": 0,
+      "sale_details_2026": 0,
+      "sale_return_2026": 0
     }
   ]
 }
