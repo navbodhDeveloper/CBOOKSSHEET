@@ -1,4 +1,4 @@
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback, useEffect } from 'react';
 import { api } from './api';
 
 // Column layout: S.N. is auto-computed from row position (not a stored/editable field —
@@ -30,6 +30,12 @@ export default function Grid({ rows, setRows, agentId, year, setStatus }) {
   // refs[rowIndex][colIndex] -> input DOM element
   const refsMap = useRef(new Map());
   const saveQueue = useRef(Promise.resolve());
+  // Always holds the CURRENT rows array. saveSection reads from this ref (not the
+  // `rows` closure) so the duplicate-Challan-No. check and the existing-record lookup
+  // always see saves that just completed a moment earlier — fixes duplicates slipping
+  // through during fast/paste-style entry across many rows in quick succession.
+  const rowsRef = useRef(rows);
+  useEffect(() => { rowsRef.current = rows; }, [rows]);
 
   const duplicateFlags = computeDuplicateFlags(rows);
   const duplicateCount = duplicateFlags.filter(Boolean).length;
@@ -139,7 +145,7 @@ export default function Grid({ rows, setRows, agentId, year, setStatus }) {
   }
 
   async function saveSection(rowIndex, section) {
-    const row = rows[rowIndex];
+    const row = rowsRef.current[rowIndex];
     const getVal = (field) => {
       const idx = fieldColIndex(section, field);
       const el = refsMap.current.get(`${rowIndex}-${idx}`);
@@ -155,10 +161,11 @@ export default function Grid({ rows, setRows, agentId, year, setStatus }) {
       if (!challan_date || !challan_no) return;
 
       // Block duplicate Challan No. — check against every OTHER row currently on the
-      // sheet (case-insensitive, trimmed). If it matches, reject the save, revert the
-      // field to whatever was last saved for this row, and tell the user why.
+      // sheet (case-insensitive, trimmed), reading the LIVE ref rather than a
+      // snapshot, so a save that just completed a moment ago (e.g. during fast/paste
+      // entry across many rows) is always accounted for here.
       const normalized = challan_no.trim().toLowerCase();
-      const dupRowIndex = rows.findIndex((r, i) => i !== rowIndex && (r.challan?.challan_no || '').trim().toLowerCase() === normalized);
+      const dupRowIndex = rowsRef.current.findIndex((r, i) => i !== rowIndex && (r.challan?.challan_no || '').trim().toLowerCase() === normalized);
       if (dupRowIndex !== -1) {
         const el = refsMap.current.get(`${rowIndex}-2`);
         if (el) el.value = row.challan?.challan_no || '';
@@ -284,7 +291,7 @@ export default function Grid({ rows, setRows, agentId, year, setStatus }) {
       </div>
       <div className="row-actions">
         <button onClick={() => { if (addBlankRow()) setTimeout(() => focusCell(rows.length, 1), 0); }}>+ Add Row</button>
-        <button className="secondary" onClick={sortByDate} style={{margin:"20px"}}>⇅ Sort by Date</button>
+        <button className="secondary" onClick={sortByDate}>⇅ Sort by Date</button>
       </div>
     </div>
   );
