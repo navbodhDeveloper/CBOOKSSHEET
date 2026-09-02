@@ -1,6 +1,35 @@
 const path = require('path');
+const fs = require('fs');
 const { Low } = require('lowdb');
 const { JSONFile } = require('lowdb/node');
+
+// Free, permanent fix for Render's ephemeral disk: if UPSTASH_REDIS_REST_URL/TOKEN are
+// set, store the whole DB as one JSON blob in Upstash Redis (free tier) instead of a
+// local file. No new npm packages needed (uses built-in fetch). Falls back to the local
+// file when those env vars are absent, so local dev is unchanged.
+const UPSTASH_URL = process.env.UPSTASH_REDIS_REST_URL;
+const UPSTASH_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
+const REDIS_KEY = 'cbookssheet_data';
+
+async function upstashCommand(cmd) {
+  const res = await fetch(UPSTASH_URL, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${UPSTASH_TOKEN}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(cmd),
+  });
+  const json = await res.json();
+  return json.result;
+}
+
+class UpstashAdapter {
+  async read() {
+    const raw = await upstashCommand(['GET', REDIS_KEY]);
+    return raw ? JSON.parse(raw) : null;
+  }
+  async write(data) {
+    await upstashCommand(['SET', REDIS_KEY, JSON.stringify(data)]);
+  }
+}
 
 const DB_PATH = path.join(__dirname, 'data.json');
 
@@ -18,7 +47,7 @@ const defaultData = {
   _seq: { regions: 0, areas: 0, agents: 0, book_types: 0, challans: 0, returns: 0, schools: 0, order_rows: 0, order_row_years: 0, parties: 0 },
 };
 
-const adapter = new JSONFile(DB_PATH);
+const adapter = (UPSTASH_URL && UPSTASH_TOKEN) ? new UpstashAdapter() : new JSONFile(DB_PATH);
 const db = new Low(adapter, defaultData);
 
 function nextId(collection) {
