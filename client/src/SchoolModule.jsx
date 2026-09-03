@@ -488,7 +488,19 @@ export default function SchoolModule({ setStatus }) {
           )}
         </div>
         <span className="status">
-          {loading ? 'Loading...' : `${filtered.length} schools`}
+          {loading ? (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              <span
+                style={{
+                  width: 14, height: 14, borderRadius: '50%',
+                  border: '2px solid #cfd8e3', borderTopColor: '#1a5fb4',
+                  display: 'inline-block', animation: 'cbss-spin 0.7s linear infinite',
+                }}
+              />
+              Loading schools...
+              <style>{'@keyframes cbss-spin { to { transform: rotate(360deg); } }'}</style>
+            </span>
+          ) : `${filtered.length} schools`}
           {duplicateIds.size > 0 && <span style={{ color: '#b00020', fontWeight: 'bold' }}> — {duplicateIds.size} duplicate rows highlighted in red</span>}
         </span>
       </section>
