@@ -192,11 +192,10 @@ export default function Grid({ rows, setRows, agentId, year, setStatus }) {
         newChallan = { id, ...payload };
       }
 
-      setRows(prev => {
-        const next = [...prev];
-        next[rowIndex] = { ...next[rowIndex], challan: newChallan };
-        return next;
-      });
+      const next1 = [...rowsRef.current];
+      next1[rowIndex] = { ...next1[rowIndex], challan: newChallan };
+      rowsRef.current = next1;
+      setRows(next1);
     } else if (section === 'ret') {
       const return_date = getVal('return_date');
       const challan_no = getVal('return_challan_no');
@@ -220,11 +219,10 @@ export default function Grid({ rows, setRows, agentId, year, setStatus }) {
         newRet = { id, ...payload };
       }
 
-      setRows(prev => {
-        const next = [...prev];
-        next[rowIndex] = { ...next[rowIndex], ret: newRet };
-        return next;
-      });
+      const next2 = [...rowsRef.current];
+      next2[rowIndex] = { ...next2[rowIndex], ret: newRet };
+      rowsRef.current = next2;
+      setRows(next2);
     }
     setStatus('Saved');
   }
@@ -291,7 +289,7 @@ export default function Grid({ rows, setRows, agentId, year, setStatus }) {
       </div>
       <div className="row-actions">
         <button onClick={() => { if (addBlankRow()) setTimeout(() => focusCell(rows.length, 1), 0); }}>+ Add Row</button>
-        <button className="secondary" onClick={sortByDate} style={{marginLeft:"20px"}}>⇅ Sort by Date</button>
+        <button className="secondary" onClick={sortByDate}>⇅ Sort by Date</button>
       </div>
     </div>
   );
