@@ -121,6 +121,11 @@ export default function SchoolModule({ setStatus }) {
   const [selectedAreaId, setSelectedAreaId] = useState('');
   const [agents, setAgents] = useState([]);
 
+  // One common Sale Date / Return Date for the whole currently-loaded sheet
+  // (list type + agent) — not per school row. Manual, no computed logic.
+  const [saleDate, setSaleDate] = useState('');
+  const [returnDate, setReturnDate] = useState('');
+
   // Which data columns are shown, keyed by field name (S.N. and the delete/action
   // column are structural and always shown, not toggleable). Restored from
   // localStorage so the choice persists across visits; defaults to "all visible".
@@ -224,6 +229,39 @@ export default function SchoolModule({ setStatus }) {
 
   useEffect(() => { load(listType, selectedAgentId); setPage(1); }, [listType, selectedAgentId, load]);
   useEffect(() => { setPage(1); }, [search, pageSize]);
+
+  // Loads the one common Sale Date / Return Date for this list type + agent sheet.
+  // Cleared (not left stale from the previous agent/list) whenever there's no agent.
+  useEffect(() => {
+    (async () => {
+      if (!selectedAgentId) { setSaleDate(''); setReturnDate(''); return; }
+      try {
+        const m = await api(`/schools/meta?list_type=${listType}&agent_id=${selectedAgentId}`);
+        setSaleDate(m.sale_date || '');
+        setReturnDate(m.return_date || '');
+      } catch (err) {
+        setStatus(err.message, true);
+      }
+    })();
+  }, [listType, selectedAgentId, setStatus]);
+
+  // Saves the one common Sale Date / Return Date for the currently loaded sheet.
+  // No validation or date-order logic — stored exactly as entered.
+  async function saveMeta(nextSaleDate = saleDate, nextReturnDate = returnDate) {
+    if (!selectedAgentId) return;
+    try {
+      await api('/schools/meta', {
+        method: 'PUT',
+        body: JSON.stringify({
+          list_type: listType, agent_id: selectedAgentId,
+          sale_date: nextSaleDate, return_date: nextReturnDate,
+        }),
+      });
+      setStatus('Saved');
+    } catch (err) {
+      setStatus(err.message, true);
+    }
+  }
 
   const duplicateIds = (() => {
     const counts = new Map();
@@ -413,6 +451,28 @@ export default function SchoolModule({ setStatus }) {
         <div className="field">
           <label>Agent</label>
           <input type="text" value={selectedAgent?.name || '—'} readOnly disabled />
+        </div>
+        {/* One common Sale Date / Return Date for the whole loaded sheet (list type +
+            agent) — not per school row. */}
+        <div className="field">
+          <label htmlFor="schoolSaleDate">Sale Date</label>
+          <input
+            id="schoolSaleDate"
+            type="date"
+            value={saleDate}
+            disabled={!selectedAgentId}
+            onChange={(e) => setSaleDate(e.target.value)}
+            onBlur={() => saveMeta()} />
+        </div>
+        <div className="field">
+          <label htmlFor="schoolReturnDate">Return Date</label>
+          <input
+            id="schoolReturnDate"
+            type="date"
+            value={returnDate}
+            disabled={!selectedAgentId}
+            onChange={(e) => setReturnDate(e.target.value)}
+            onBlur={() => saveMeta()} />
         </div>
         <div className="tabs">
           {LIST_TABS.map(t => (

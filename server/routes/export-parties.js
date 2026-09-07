@@ -13,6 +13,27 @@ function colToLetter(n) {
   return s;
 }
 
+// Formats a yyyy-mm-dd value (from a <input type="date">) as d/mm/yyyy, e.g.
+// "2021-08-02" -> "2/08/2021". No computed logic beyond this formatting — the date is
+// stored and shown exactly as the user typed it.
+function formatDMY(iso) {
+  if (!iso) return '';
+  const parts = String(iso).split('-');
+  if (parts.length !== 3) return '';
+  const [y, m, d] = parts;
+  if (!y || !m || !d) return '';
+  return `${parseInt(d, 10)}/${m}/${y}`;
+}
+
+// Combines the sheet's one common Sale Date and Return Date into one display string,
+// e.g. "2/08/2021 - 18/09/2023". If only one is set, shows just that one.
+function dateRangeDisplay(saleDate, returnDate) {
+  const s = formatDMY(saleDate);
+  const r = formatDMY(returnDate);
+  if (s && r) return `${s} - ${r}`;
+  return s || r || '';
+}
+
 // GET /api/export/parties?agent_id=1&cycle_start_year=2026
 router.get('/parties', async (req, res) => {
   const { agent_id, cycle_start_year, agent_display_name } = req.query;
@@ -34,6 +55,12 @@ router.get('/parties', async (req, res) => {
   );
   parties = parties.sort((a, b) => (Number(a.s_no) || 0) - (Number(b.s_no) || 0) || a.id - b.id);
 
+  // One common Sale Date / Return Date for the whole sheet (agent+cycle) — not per row.
+  const meta = (db.data.party_sheet_meta || []).find(m =>
+    String(m.agent_id) === String(agent_id) && Number(m.cycle_start_year) === start
+  );
+  const dateRangeLine = meta ? dateRangeDisplay(meta.sale_date, meta.return_date) : '';
+
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Parties');
 
@@ -51,10 +78,19 @@ router.get('/parties', async (req, res) => {
   sheet.getCell(2, 1).font = { bold: true, size: 11 };
   sheet.getCell(2, 1).alignment = { horizontal: 'center' };
 
-  // Two-row header starting at row 3: S.N./Party Name/Remark span both rows,
-  // each year spans 3 columns in row 3 with Sale Details/Sale Return/Net Sale in row 4.
-  const headerRow1 = 3;
-  const headerRow2 = 4;
+  // One common Date line for the whole sheet (Sale Date - Return Date), e.g.
+  // "Date :- 2/08/2021 - 18/09/2023" — always present (even if blank) so the row
+  // position stays consistent whether or not dates have been entered yet.
+  sheet.mergeCells(3, 1, 3, totalCols);
+  sheet.getCell(3, 1).value = `Date :- ${dateRangeLine}`;
+  sheet.getCell(3, 1).font = { bold: true, size: 11 };
+  sheet.getCell(3, 1).alignment = { horizontal: 'center' };
+
+  // Two-row header starting at row 4 (shifted down by 1 for the Date line above):
+  // S.N./Party Name/Remark span both rows, each year spans 3 columns in row 4 with
+  // Sale Details/Sale Return/Net Sale in row 5.
+  const headerRow1 = 4;
+  const headerRow2 = 5;
 
   sheet.mergeCells(headerRow1, 1, headerRow2, 1);
   sheet.getCell(headerRow1, 1).value = 'S.N.';
@@ -214,5 +250,3 @@ router.get('/parties', async (req, res) => {
 });
 
 module.exports = router;
-
-  

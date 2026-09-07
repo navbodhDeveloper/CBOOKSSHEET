@@ -57,7 +57,32 @@ export default function Grid({ rows, setRows, agentId, year, setStatus }) {
       const t = new Date(d).getTime();
       return Number.isNaN(t) ? Infinity : t;
     };
-    const sorted = [...rows].sort((a, b) => parseDate(a.challan?.challan_date) - parseDate(b.challan?.challan_date));
+
+    // जावक and आवक/वापसी rows are only ever zipped together by array position — not by
+    // any real relationship (see rows[i] = {challan, ret} in the data model). So each
+    // side must be sorted independently, ascending by its own date, and THEN re-zipped
+    // by position. Sorting the combined row by जावक date only (the old behavior) left
+    // the आवक side in whatever order it happened to ride along in.
+    const challans = rows
+      .map(r => r.challan)
+      .filter(Boolean)
+      .sort((a, b) => parseDate(a.challan_date) - parseDate(b.challan_date));
+
+    const returns = rows
+      .map(r => r.ret)
+      .filter(Boolean)
+      .sort((a, b) => parseDate(a.return_date) - parseDate(b.return_date));
+
+    const maxLen = Math.max(challans.length, returns.length);
+    const sorted = [];
+    for (let i = 0; i < maxLen; i++) {
+      sorted.push({
+        rowKey: `row-sorted-${i}-${Date.now()}-${Math.random()}`,
+        challan: challans[i] ?? null,
+        ret: returns[i] ?? null,
+      });
+    }
+
     setRows(sorted);
     try {
       for (let i = 0; i < sorted.length; i++) {
@@ -65,7 +90,7 @@ export default function Grid({ rows, setRows, agentId, year, setStatus }) {
         if (row.challan?.id) await api(`/challans/${row.challan.id}`, { method: 'PUT', body: JSON.stringify({ ...row.challan, s_no: i + 1 }) });
         if (row.ret?.id) await api(`/challans/returns/${row.ret.id}`, { method: 'PUT', body: JSON.stringify({ ...row.ret, s_no: i + 1 }) });
       }
-      setStatus('Sorted by date');
+      setStatus('Sorted by date (जावक and आवक/वापसी sorted independently)');
     } catch (err) {
       setStatus(err.message, true);
     }

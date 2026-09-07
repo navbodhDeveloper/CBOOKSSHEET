@@ -9,6 +9,41 @@ const LIST_LABELS = {
   CBSE: 'CBSE',
 };
 
+// Fields that get summed into the TOTAL row — same set as client/src/SchoolModule.jsx's
+// NUMERIC_FIELDS. Computed columns (Total Spec. Distribute / NET SPE / Net Sale) are
+// summed too, via their own `compute` function below — everything else (name, code,
+// grade, medium, board, month/date/text fields) is left blank in the TOTAL row, exactly
+// matching how the on-screen footer only fills in numeric/computed columns.
+const NUMERIC_FIELDS = new Set([
+  'specimen_given_2021', 'specimen_given_ayogya_2021', 'specimen_returned_2021',
+  'specimen_given_2022', 'specimen_given_ayogya_2022', 'specimen_returned_2022',
+  'specimen_given_2023', 'specimen_given_ayogya_2023', 'specimen_returned_2023',
+  'sale_details_2021', 'sale_return_2021',
+  'sale_details_2022', 'sale_return_2022',
+  'sale_details_2023', 'sale_return_2023',
+]);
+
+// Formats a yyyy-mm-dd value (from a <input type="date">) as d/mm/yyyy, e.g.
+// "2021-08-02" -> "2/08/2021". No computed logic beyond this formatting — the date is
+// stored and shown exactly as the user typed it.
+function formatDMY(iso) {
+  if (!iso) return '';
+  const parts = String(iso).split('-');
+  if (parts.length !== 3) return '';
+  const [y, m, d] = parts;
+  if (!y || !m || !d) return '';
+  return `${parseInt(d, 10)}/${m}/${y}`;
+}
+
+// Combines the sheet's one common Sale Date and Return Date into one display string,
+// e.g. "2/08/2021 - 18/09/2023". If only one is set, shows just that one.
+function dateRangeDisplay(saleDate, returnDate) {
+  const s = formatDMY(saleDate);
+  const r = formatDMY(returnDate);
+  if (s && r) return `${s} - ${r}`;
+  return s || r || '';
+}
+
 // [field, header label, width, compute?] — computed columns use a string ID (matching
 // the same keys used in client/src/SchoolModule.jsx's COMPUTED object) instead of a
 // real DB field, so the `fields` query param (column picker selections from the UI)
@@ -82,6 +117,14 @@ router.get('/school-list', async (req, res) => {
   if (agent_id) schools = schools.filter(s => String(s.agent_id) === String(agent_id));
   schools = schools.sort((a, b) => a.id - b.id);
 
+  // One common Sale Date / Return Date for the whole sheet (list type + agent) — not
+  // per school row. Only meaningful when exporting for a single agent, since the
+  // date is stored per (list_type, agent) — left blank if exporting across all agents.
+  const meta = agent_id
+    ? (db.data.school_sheet_meta || []).find(m => m.list_type === list_type && String(m.agent_id) === String(agent_id))
+    : null;
+  const dateRangeLine = meta ? dateRangeDisplay(meta.sale_date, meta.return_date) : '';
+
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet(LIST_LABELS[list_type]);
 
@@ -97,7 +140,16 @@ router.get('/school-list', async (req, res) => {
   sheet.getCell(2, 1).value = `List: ${LIST_LABELS[list_type]}${isPartial ? ' (partial columns — view/print only, not for re-import)' : ''}`;
   sheet.getCell(2, 1).font = { bold: true };
 
-  const headerRow = 3;
+  // One common Date line for the whole sheet (Sale Date - Return Date), e.g.
+  // "Date :- 2/08/2021 - 18/09/2023" — always present (even if blank) so the row
+  // position stays consistent whether or not dates have been entered yet.
+  sheet.mergeCells(3, 1, 3, lastCol);
+  sheet.getCell(3, 1).value = `Date :- ${dateRangeLine}`;
+  sheet.getCell(3, 1).font = { bold: true };
+  sheet.getCell(3, 1).alignment = { horizontal: 'center' };
+
+  // Header shifted down by 1 row (row 4) to make room for the Date line above.
+  const headerRow = 4;
   sheet.getCell(headerRow, 1).value = 'S.N.';
   sheet.getCell(headerRow, 1).font = { bold: true };
   activeColumns.forEach(([field, label], idx) => {
@@ -119,20 +171,39 @@ router.get('/school-list', async (req, res) => {
     });
   });
 
+  const lastDataRow = headerRow + schools.length;
+
+  // TOTAL row — sums the same numeric/computed columns as the on-screen footer in
+  // SchoolModule.jsx (specimen given/returned, sale details/return, and the computed
+  // Total Spec. Distribute / NET SPE / Net Sale columns). Text/date/select columns are
+  // left blank, same as the footer shows an empty cell for those.
+  const totalRow = lastDataRow + 1;
+  sheet.getCell(totalRow, 1).value = 'TOTAL:-';
+  activeColumns.forEach(([field, , , compute], idx) => {
+    if (compute || NUMERIC_FIELDS.has(field)) {
+      const total = schools.reduce((sum, s) => {
+        const v = compute ? compute(s) : Number(s[field]) || 0;
+        return sum + (Number(v) || 0);
+      }, 0);
+      sheet.getCell(totalRow, idx + 2).value = total;
+    }
+  });
+  sheet.getRow(totalRow).font = { bold: true };
+  sheet.getRow(totalRow).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } };
+
   sheet.getColumn(1).width = 6;
   activeColumns.forEach(([, , width], idx) => {
     sheet.getColumn(idx + 2).width = width;
   });
 
-  const lastRow = headerRow + schools.length;
-  for (let row = 1; row <= lastRow; row++) {
+  for (let row = 1; row <= totalRow; row++) {
     for (let col = 1; col <= lastCol; col++) {
       sheet.getCell(row, col).border = {
         top: { style: 'thin' }, left: { style: 'thin' },
         bottom: { style: 'thin' }, right: { style: 'thin' },
       };
     }
-  }
+  } 
 
   const filename = `${LIST_LABELS[list_type].replace(/[^\w]+/g, '_')}${isPartial ? '_partial' : ''}.xlsx`;
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');

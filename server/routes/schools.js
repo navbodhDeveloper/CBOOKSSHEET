@@ -67,6 +67,20 @@ function findDuplicate(list_type, school_code, school_name_address, excludeId) {
   );
 }
 
+// One common Sale Date / Return Date per (list_type, agent) sheet — NOT per school row.
+// Manual, no computed logic — stored exactly as entered. Defensive init since older
+// data blobs won't have this array yet.
+function ensureSchoolMetaArray() {
+  if (!db.data.school_sheet_meta) db.data.school_sheet_meta = [];
+}
+
+function findSchoolMeta(list_type, agent_id) {
+  ensureSchoolMetaArray();
+  return db.data.school_sheet_meta.find(m =>
+    m.list_type === list_type && String(m.agent_id) === String(agent_id)
+  );
+}
+
 // GET /api/schools?list_type=MASTER&search=abc&agent_id=1
 router.get('/', (req, res) => {
   const { list_type, search, agent_id } = req.query;
@@ -81,6 +95,34 @@ router.get('/', (req, res) => {
     );
   }
   res.json(rows);
+});
+
+// GET /api/schools/meta?list_type=MASTER&agent_id=1
+// Registered BEFORE "/:id" below so "/meta" isn't swallowed by the ":id" pattern.
+router.get('/meta', (req, res) => {
+  const { list_type, agent_id } = req.query;
+  if (!list_type) return res.status(400).json({ error: 'list_type is required' });
+  if (!agent_id) return res.status(400).json({ error: 'agent_id is required' });
+  const meta = findSchoolMeta(list_type, agent_id);
+  res.json({ sale_date: meta?.sale_date || '', return_date: meta?.return_date || '' });
+});
+
+// PUT /api/schools/meta  { list_type, agent_id, sale_date, return_date }
+router.put('/meta', async (req, res) => {
+  const { list_type, agent_id, sale_date, return_date } = req.body;
+  if (!list_type) return res.status(400).json({ error: 'list_type is required' });
+  if (!agent_id) return res.status(400).json({ error: 'agent_id is required' });
+
+  ensureSchoolMetaArray();
+  let meta = findSchoolMeta(list_type, agent_id);
+  if (!meta) {
+    meta = { id: nextId('school_sheet_meta'), list_type, agent_id: Number(agent_id) };
+    db.data.school_sheet_meta.push(meta);
+  }
+  meta.sale_date = sale_date || '';
+  meta.return_date = return_date || '';
+  await db.write();
+  res.json(meta);
 });
 
 // GET /api/schools/:id
@@ -202,4 +244,4 @@ router.post('/dedupe', async (req, res) => {
   res.json({ removed: toRemove.length });
 });
 
-module.exports = router;  
+module.exports = router;

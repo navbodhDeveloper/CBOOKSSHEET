@@ -6,6 +6,8 @@ import { api, API_BASE } from './api';
 // Column order for keyboard navigation: Party Name(1)
 // then per year: Sale Details, Sale Return (Net Sale is computed, not focusable)
 // then Remark last.
+// NOTE: Sale Date / Return Date are NOT per-row — they're one common value for the
+// whole agent+cycle sheet (see saleDate/returnDate state below), manual, no computed logic.
 export default function PartyModule({ setStatus }) {
   const [states, setStates] = useState(['MP', 'CG']);
   const [selectedState, setSelectedState] = useState('MP');
@@ -18,6 +20,10 @@ export default function PartyModule({ setStatus }) {
   const [parties, setParties] = useState([]);
   const [summary, setSummary] = useState(null);
   const [loaded, setLoaded] = useState(false);
+  // One common Sale Date / Return Date for the whole currently-loaded sheet
+  // (agent + cycle) — not per party row. Manual, no computed logic.
+  const [saleDate, setSaleDate] = useState('');
+  const [returnDate, setReturnDate] = useState('');
   const cellRefs = useRef(new Map()); // "rowIndex-colIndex" -> element
 
   useEffect(() => {
@@ -71,11 +77,17 @@ export default function PartyModule({ setStatus }) {
   const years = selectedCycle ? [selectedCycle, selectedCycle + 1, selectedCycle + 2] : [];
 
   const load = useCallback(async (agentId, cycle) => {
-    if (!agentId) { setParties([]); setSummary(null); setLoaded(false); return; }
+    if (!agentId) {
+      setParties([]); setSummary(null); setLoaded(false);
+      setSaleDate(''); setReturnDate('');
+      return;
+    }
     try {
       const data = await api(`/parties?agent_id=${agentId}&cycle_start_year=${cycle}`);
       setParties(data.rows);
       setSummary(data.summary);
+      setSaleDate(data.meta?.sale_date || '');
+      setReturnDate(data.meta?.return_date || '');
       setLoaded(true);
     } catch (err) {
       setStatus(err.message, true);
@@ -86,6 +98,24 @@ export default function PartyModule({ setStatus }) {
     if (!selectedAgentId) { setStatus('Select an Area first', true); return; }
     setSelectedCycle(cycleStartYear);
     load(selectedAgentId, cycleStartYear);
+  }
+
+  // Saves the one common Sale Date / Return Date for the currently loaded sheet.
+  // No validation or date-order logic — stored exactly as entered.
+  async function saveMeta(nextSaleDate = saleDate, nextReturnDate = returnDate) {
+    if (!selectedAgentId || !selectedCycle) return;
+    try {
+      await api('/parties/meta', {
+        method: 'PUT',
+        body: JSON.stringify({
+          agent_id: selectedAgentId, cycle_start_year: selectedCycle,
+          sale_date: nextSaleDate, return_date: nextReturnDate,
+        }),
+      });
+      setStatus('Saved');
+    } catch (err) {
+      setStatus(err.message, true);
+    }
   }
 
   // A row counts as "started" if it has a Party Name, a Remark, or any non-zero
@@ -120,6 +150,20 @@ export default function PartyModule({ setStatus }) {
       setStatus(err.message, true);
     }
   }, [parties, selectedAgentId, selectedCycle, years, setStatus]);
+
+  async function handleCleanEmpty() {
+    if (!window.confirm('Remove empty rows (no Party Name, no Remark, all amounts zero) from this sheet? This cannot be undone.')) return;
+    try {
+      const result = await api('/parties/cleanup-empty', {
+        method: 'POST',
+        body: JSON.stringify({ agent_id: selectedAgentId, cycle_start_year: selectedCycle }),
+      });
+      setStatus(`Removed ${result.removed} empty rows`);
+      await load(selectedAgentId, selectedCycle);
+    } catch (err) {
+      setStatus(err.message, true);
+    }
+  }
 
   function addBlankRow() {
     if (!selectedAgentId || !selectedCycle) { setStatus('Load a sheet first', true); return false; }
@@ -176,6 +220,15 @@ export default function PartyModule({ setStatus }) {
 
   async function saveRow(idx) {
     const row = parties[idx];
+    // Never POST a brand-new row that's still completely empty (no name, no remark,
+    // every Sale Details/Return still zero) — this is what let tabbing through unused
+    // cells silently create ghost rows on the server. Editing an EXISTING saved row
+    // (row.id set) still goes through as normal, even if the user clears it out.
+    if (!row.id) {
+      const hasData = (row.party_name || '').trim() || (row.remark || '').trim() ||
+        years.some(y => (Number(row[`sale_details_${y}`]) || 0) !== 0 || (Number(row[`sale_return_${y}`]) || 0) !== 0);
+      if (!hasData) return;
+    }
     const payload = {
       agent_id: selectedAgentId,
       cycle_start_year: selectedCycle,
@@ -297,9 +350,31 @@ export default function PartyModule({ setStatus }) {
             {cycleOptions.map(y => <option key={y} value={y}>{y} - {y + 1} - {y + 2}</option>)}
           </select>
         </div>
+        {/* One common Sale Date / Return Date for the whole loaded sheet — not per row. */}
+        <div className="field">
+          <label htmlFor="partySaleDate">Sale Date</label>
+          <input
+            id="partySaleDate"
+            type="date"
+            value={saleDate}
+            disabled={!loaded}
+            onChange={(e) => setSaleDate(e.target.value)}
+            onBlur={() => saveMeta()} />
+        </div>
+        <div className="field">
+          <label htmlFor="partyReturnDate">Return Date</label>
+          <input
+            id="partyReturnDate"
+            type="date"
+            value={returnDate}
+            disabled={!loaded}
+            onChange={(e) => setReturnDate(e.target.value)}
+            onBlur={() => saveMeta()} />
+        </div>
         <button onClick={loadSheet}>Load Sheet</button>
         <button onClick={addBlankRow} disabled={!loaded}>+ Add Row</button>
         <button className="secondary" disabled={!loaded} onClick={sortByName}>⇅ Sort by Name</button>
+        <button className="secondary" disabled={!loaded} onClick={handleCleanEmpty}>🧹 Clean Empty Rows</button>
         <button className="secondary" disabled={!loaded} onClick={doExport}>⬇ Export to Excel</button>
       </section>
 
@@ -415,7 +490,7 @@ export default function PartyModule({ setStatus }) {
                     <th>Year</th>
                     <th>Sale Details</th>
                     <th>Sale Return</th>
-                    <th>Net Sale</th>
+                    <th style={{ minWidth: 110, fontSize: '1.05em' }}>Net Sale</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -424,7 +499,7 @@ export default function PartyModule({ setStatus }) {
                       <td>{y}</td>
                       <td>{summary.netTotals[y]?.details || 0}</td>
                       <td>{summary.netTotals[y]?.return || 0}</td>
-                      <td>{summary.netTotals[y]?.net || 0}</td>
+                      <td style={{ fontSize: '1.1em', fontWeight: 'bold' }}>{summary.netTotals[y]?.net || 0}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -439,7 +514,7 @@ export default function PartyModule({ setStatus }) {
                 <table className="grid summary-grid">
                   <thead>
                     <tr>
-                      <th rowSpan={2}>Party Name</th>
+                      <th rowSpan={2} style={{ minWidth: 220 }}>Party Name</th>
                       {years.map(y => <th key={y} colSpan={3}>{y}</th>)}
                     </tr>
                     <tr>
@@ -447,7 +522,7 @@ export default function PartyModule({ setStatus }) {
                         <Fragment key={y}>
                           <th>Sale Details</th>
                           <th>Sale Return</th>
-                          <th>Net Sale</th>
+                          <th style={{ minWidth: 110, fontSize: '1.05em' }}>Net Sale</th>
                         </Fragment>
                       ))}
                     </tr>
@@ -455,14 +530,14 @@ export default function PartyModule({ setStatus }) {
                   <tbody>
                     {partyYearTotalsList.map(pt => (
                       <tr key={pt.name}>
-                        <td className="text-left">{pt.name}</td>
+                        <td className="text-left" style={{ whiteSpace: 'normal', wordBreak: 'break-word' }}>{pt.name}</td>
                         {years.map(y => {
                           const yd = pt.years[y];
                           return (
                             <Fragment key={y}>
                               <td>{yd.details}</td>
                               <td>{yd.ret}</td>
-                              <td>{yd.details - yd.ret}</td>
+                              <td style={{ fontSize: '1.1em', fontWeight: 'bold' }}>{yd.details - yd.ret}</td>
                             </Fragment>
                           );
                         })}
