@@ -38,14 +38,14 @@ router.get('/', (req, res) => {
 
 // POST /api/challans
 router.post('/', async (req, res) => {
-  const { agent_id, year, s_no, challan_date, challan_no, total_books, items } = req.body;
+  const { agent_id, year, s_no, challan_date, book_type, type_qty, challan_no, total_books, items } = req.body;
   if (!agent_id || !year || !challan_date || !challan_no) {
     return res.status(400).json({ error: 'agent_id, year, challan_date, challan_no are required' });
   }
   const challan = {
     id: nextId('challans'),
     agent_id: Number(agent_id), year: Number(year), s_no: s_no ? Number(s_no) : null,
-    challan_date, challan_no, total_books: Number(total_books) || 0,
+    challan_date, book_type: book_type || null, type_qty: Number(type_qty) || 0, challan_no, total_books: Number(total_books) || 0,
     items: (items || []).filter(i => Number(i.quantity) !== 0).map(i => ({ book_type_id: i.book_type_id, quantity: Number(i.quantity) })),
   };
   db.data.challans.push(challan);
@@ -56,19 +56,21 @@ router.post('/', async (req, res) => {
 // PUT /api/challans/:id
 router.put('/:id', async (req, res) => {
   const id = Number(req.params.id);
-  const { s_no, challan_date, challan_no, total_books, items } = req.body;
-  const challan = db.data.challans.find(c => c.id === id);
+  const { s_no, challan_date, book_type, type_qty, challan_no, total_books, items } = req.body;
+  const challan = db.data.challans.find(c => c.id === id); 
   if (!challan) return res.status(404).json({ error: 'not found' });
 
   challan.s_no = s_no ? Number(s_no) : null;
   challan.challan_date = challan_date;
+  challan.book_type = book_type || null;
+  challan.type_qty = Number(type_qty) || 0;
   challan.challan_no = challan_no;
   challan.total_books = Number(total_books) || 0;
   challan.items = (items || []).filter(i => Number(i.quantity) !== 0).map(i => ({ book_type_id: i.book_type_id, quantity: Number(i.quantity) }));
 
   await db.write();
   res.json({ ok: true });
-});
+}); 
 
 // DELETE /api/challans/:id
 router.delete('/:id', async (req, res) => {

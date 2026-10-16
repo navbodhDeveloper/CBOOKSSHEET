@@ -13,6 +13,12 @@ const COLUMN_VISIBILITY_KEY = 'schoolMasterList.visibleColumns';
 
 // Field/label pairs, in the exact sequence from the reference sheet.
 // specimen_given_2021/22/23 = "Specimen Given Yogya" (reused from before so existing data carries over)
+// NOTE: "School Visit Date / App Location - I/II/III" used to be 3 separate fixed
+// columns (visit_1/2/3). They're now ONE "School Visit Date" column backed by an
+// open-ended `visits` array per school — a school can have as many visits as needed,
+// each with its own Date + Remark, added one at a time through a popup (see
+// getVisits / VisitDialog below). visit_1/2/3 are no longer edited directly, but old
+// data saved under those fields is still read and shown via getVisits' fallback.
 const COLUMNS = [
   ['school_code', 'School Code'],
   ['school_name_address', 'School Name / Address'],
@@ -53,9 +59,7 @@ const COLUMNS = [
   ['sale_return_2023', '2023 Sale Return'],
   ['NET_SALE_2023', '2023 Net Sale'],
 
-  ['visit_1', 'School Visit Date / App Location - I'],
-  ['visit_2', 'School Visit Date / App Location - II'],
-  ['visit_3', 'School Visit Date / App Location - III'],
+  ['visits', 'School Visit Date'],
 
   ['supplying_party', 'Supplying Party'],
   ['discussion_2023', 'Discussion 2023'],
@@ -94,6 +98,17 @@ function dupKey(s) {
   return `${code}|${name}`;
 }
 
+// Reads a school's visits as an array of { date, remark }. If the school already has
+// the new `visits` array, use it as-is. Otherwise (older data saved before this
+// feature), fall back to building one from the old fixed visit_1/2/3 fields — nothing
+// is lost, it just displays as 1-3 undated entries until the user edits and saves,
+// at which point the real `visits` array takes over and visit_1/2/3 are cleared.
+function getVisits(school) {
+  if (Array.isArray(school.visits)) return school.visits;
+  const legacy = [school.visit_1, school.visit_2, school.visit_3].filter(v => (v || '').toString().trim());
+  return legacy.map(v => ({ date: '', remark: String(v) }));
+}
+
 export default function SchoolModule({ setStatus }) {
   const [listType, setListType] = useState('MASTER');
   const [schools, setSchools] = useState([]);
@@ -105,6 +120,22 @@ export default function SchoolModule({ setStatus }) {
   const saveTimers = useRef({});
   const fileInputRef = useRef(null);
   const cellRefs = useRef(new Map());
+  // Which school's visit popup is open (by id), or null when none is open.
+  const [visitEditorId, setVisitEditorId] = useState(null);
+  // Export-to-Excel Board filter popup: open/closed, and which Board values are
+  // currently checked (keyed by the exact free-text value typed into the Board column,
+  // e.g. "MP", "CG", "CBSE" — whatever values are actually in use).
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [exportBoards, setExportBoards] = useState(new Set());
+  // Row selection (checkbox per row, like the Columns picker but for rows): which
+  // school ids are checked. Selecting any rows restricts "Export to Excel" to just
+  // those rows, skipping the Board picker — picking exact rows is more specific than
+  // picking a board. Empty selection = export behaves exactly as before (every row,
+  // optionally narrowed by Board).
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  // When on, the sheet shows ONLY the checked rows instead of the full list — a quick
+  // way to review just what's selected before exporting.
+  const [showSelectedOnly, setShowSelectedOnly] = useState(false);
   // Always holds the CURRENT schools array. saveSchool reads from this ref (not a
   // closure over `schools`) so a debounced save firing 400ms later always picks up
   // every keystroke typed in the meantime, instead of overwriting them with whatever
@@ -121,11 +152,6 @@ export default function SchoolModule({ setStatus }) {
   const [selectedAreaId, setSelectedAreaId] = useState('');
   const [agents, setAgents] = useState([]);
 
-  // One common Sale Date / Return Date for the whole currently-loaded sheet
-  // (list type + agent) — not per school row. Manual, no computed logic.
-  const [saleDate, setSaleDate] = useState('');
-  const [returnDate, setReturnDate] = useState('');
-
   // Which data columns are shown, keyed by field name (S.N. and the delete/action
   // column are structural and always shown, not toggleable). Restored from
   // localStorage so the choice persists across visits; defaults to "all visible".
@@ -137,7 +163,12 @@ export default function SchoolModule({ setStatus }) {
         // Guard against a stale saved list missing newer columns — anything not
         // present in the saved list yet still stays hidden only if it WAS present
         // and unchecked; brand-new fields default to visible.
-        return new Set(COLUMNS.map(([field]) => field).filter(field => savedFields.has(field)));
+        const restored = new Set(COLUMNS.map(([field]) => field).filter(field => savedFields.has(field)));
+        // 'visits' replaces the old visit_1/2/3 columns — always show it even for a
+        // visitor whose saved column selection predates this change, so it doesn't
+        // just silently disappear from view.
+        restored.add('visits');
+        return restored;
       }
     } catch {
       // ignore malformed/missing localStorage data and fall back to defaults
@@ -228,40 +259,7 @@ export default function SchoolModule({ setStatus }) {
   }, [setStatus]);
 
   useEffect(() => { load(listType, selectedAgentId); setPage(1); }, [listType, selectedAgentId, load]);
-  useEffect(() => { setPage(1); }, [search, pageSize]);
-
-  // Loads the one common Sale Date / Return Date for this list type + agent sheet.
-  // Cleared (not left stale from the previous agent/list) whenever there's no agent.
-  useEffect(() => {
-    (async () => {
-      if (!selectedAgentId) { setSaleDate(''); setReturnDate(''); return; }
-      try {
-        const m = await api(`/schools/meta?list_type=${listType}&agent_id=${selectedAgentId}`);
-        setSaleDate(m.sale_date || '');
-        setReturnDate(m.return_date || '');
-      } catch (err) {
-        setStatus(err.message, true);
-      }
-    })();
-  }, [listType, selectedAgentId, setStatus]);
-
-  // Saves the one common Sale Date / Return Date for the currently loaded sheet.
-  // No validation or date-order logic — stored exactly as entered.
-  async function saveMeta(nextSaleDate = saleDate, nextReturnDate = returnDate) {
-    if (!selectedAgentId) return;
-    try {
-      await api('/schools/meta', {
-        method: 'PUT',
-        body: JSON.stringify({
-          list_type: listType, agent_id: selectedAgentId,
-          sale_date: nextSaleDate, return_date: nextReturnDate,
-        }),
-      });
-      setStatus('Saved');
-    } catch (err) {
-      setStatus(err.message, true);
-    }
-  }
+  useEffect(() => { setPage(1); }, [search, pageSize, showSelectedOnly]);
 
   const duplicateIds = (() => {
     const counts = new Map();
@@ -278,11 +276,20 @@ export default function SchoolModule({ setStatus }) {
     return ids;
   })();
 
-  const filtered = search.trim()
+  let filtered = search.trim()
     ? schools.filter(s =>
         (s.school_name_address || '').toLowerCase().includes(search.toLowerCase()) ||
         (s.school_code || '').toLowerCase().includes(search.toLowerCase()))
     : schools;
+  if (showSelectedOnly) filtered = filtered.filter(s => selectedIds.has(s.id));
+
+  // Distinct Board values actually present in the currently loaded list (e.g. "MP",
+  // "CG", "CBSE") — whatever agents have typed into the Board column — used to build
+  // the checkbox list in the Export dialog. Board is free text, not a fixed dropdown,
+  // so this reflects real data instead of a hardcoded guess.
+  const boardOptions = Array.from(
+    new Set(schools.map(s => (s.board || '').trim()).filter(Boolean))
+  ).sort((a, b) => a.localeCompare(b));
 
   const totals = {};
   for (const [field] of COLUMNS) {
@@ -301,6 +308,35 @@ export default function SchoolModule({ setStatus }) {
 
   function updateLocal(id, field, value) {
     setSchools(prev => prev.map(s => (s.id === id ? { ...s, [field]: value } : s)));
+  }
+
+  function toggleRowSelected(id) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  // Header checkbox: selects/clears every row in the CURRENT filtered list (i.e. what
+  // search is showing), not just the current page — matches what someone expects from
+  // "select all" while searched/filtered.
+  const allFilteredSelected = filtered.length > 0 && filtered.every(s => selectedIds.has(s.id));
+  function toggleSelectAllFiltered() {
+    setSelectedIds(prev => {
+      if (allFilteredSelected) {
+        const next = new Set(prev);
+        filtered.forEach(s => next.delete(s.id));
+        return next;
+      }
+      const next = new Set(prev);
+      filtered.forEach(s => next.add(s.id));
+      return next;
+    });
+  }
+  function clearSelection() {
+    setSelectedIds(new Set());
+    setShowSelectedOnly(false); // nothing left to show-only once selection is cleared
   }
 
   const setCellRef = (rowIndex, colIndex) => (el) => {
@@ -343,10 +379,21 @@ export default function SchoolModule({ setStatus }) {
     saveTimers.current[id] = setTimeout(() => saveSchool(id), 400);
   }, [saveSchool]);
 
+  // Saves a school's edited visit list. Clears the legacy visit_1/2/3 fields at the
+  // same time so a school only ever carries its visits in one place going forward.
+  function saveVisits(schoolId, visits) {
+    updateLocal(schoolId, 'visits', visits);
+    updateLocal(schoolId, 'visit_1', null);
+    updateLocal(schoolId, 'visit_2', null);
+    updateLocal(schoolId, 'visit_3', null);
+    queueSave(schoolId);
+    setVisitEditorId(null);
+  }
+
   function addBlankSchool() {
     const tempId = `new-${Date.now()}`;
     const blank = { id: tempId, list_type: listType, agent_id: selectedAgentId };
-    for (const [field] of COLUMNS) blank[field] = '';
+    for (const [field] of COLUMNS) blank[field] = field === 'visits' ? [] : '';
     setSchools(prev => [blank, ...prev]);
     setPage(1);
   }
@@ -364,13 +411,39 @@ export default function SchoolModule({ setStatus }) {
     }
   }
 
+  // "Export to Excel": if specific rows are checked (the new row-selection checkboxes),
+  // export exactly those rows and skip the Board picker — an explicit row selection is
+  // more specific than a board filter. Otherwise, fall back to the Board-filter popup
+  // (if more than one Board value is in use) or a plain full export.
   function doExport() {
+    if (selectedIds.size > 0) {
+      runExport(null);
+      return;
+    }
+    if (boardOptions.length > 1) {
+      setExportBoards(new Set(boardOptions)); // default: every board checked
+      setShowExportDialog(true);
+    } else {
+      runExport(null);
+    }
+  }
+
+  // selectedBoards: a Set of Board values to include, or null for "every board" (no
+  // filter param sent at all — same as the export behaved before this feature existed).
+  // Ignored entirely when specific rows are checked (selectedIds), since picking exact
+  // rows already says precisely what to export.
+  function runExport(selectedBoards) {
     const qs = new URLSearchParams({ list_type: listType });
     if (selectedAgentId) qs.set('agent_id', selectedAgentId);
     // Only the checked columns are included, in the fixed canonical order (not the
     // order they were checked). A partial export is fine for viewing/printing/sharing,
     // but is NOT safe to re-import — Import expects every column in its fixed position.
     qs.set('fields', displayColumns.map(([field]) => field).join(','));
+    if (selectedIds.size > 0) {
+      qs.set('ids', [...selectedIds].join(','));
+    } else if (selectedBoards && selectedBoards.size > 0 && selectedBoards.size < boardOptions.length) {
+      qs.set('board', [...selectedBoards].join(','));
+    }
     if (displayColumns.length < COLUMNS.length) {
       const proceed = window.confirm(
         `You're exporting ${displayColumns.length} of ${COLUMNS.length} columns. This file is fine for viewing or printing, but it should NOT be used with "Import from Excel" later — only a full export (Select All) is safe to re-import.\n\nContinue with this partial export?`
@@ -378,6 +451,23 @@ export default function SchoolModule({ setStatus }) {
       if (!proceed) return;
     }
     window.location.href = `${API_BASE}/api/export/school-list?${qs.toString()}`;
+  }
+
+  function confirmExportDialog() {
+    if (exportBoards.size === 0) {
+      window.alert('Select at least one Board to export.');
+      return;
+    }
+    setShowExportDialog(false);
+    runExport(exportBoards);
+  }
+
+  function toggleExportBoard(board) {
+    setExportBoards(prev => {
+      const next = new Set(prev);
+      if (next.has(board)) next.delete(board); else next.add(board);
+      return next;
+    });
   }
 
   function handleImportClick() {
@@ -430,6 +520,8 @@ export default function SchoolModule({ setStatus }) {
     setPage(1);
   }
 
+  const visitEditorSchool = visitEditorId !== null ? schools.find(s => s.id === visitEditorId) : null;
+
   return (
     <>
       <div className="module-title">School Master List</div>
@@ -451,28 +543,6 @@ export default function SchoolModule({ setStatus }) {
         <div className="field">
           <label>Agent</label>
           <input type="text" value={selectedAgent?.name || '—'} readOnly disabled />
-        </div>
-        {/* One common Sale Date / Return Date for the whole loaded sheet (list type +
-            agent) — not per school row. */}
-        <div className="field">
-          <label htmlFor="schoolSaleDate">Sale Date</label>
-          <input
-            id="schoolSaleDate"
-            type="date"
-            value={saleDate}
-            disabled={!selectedAgentId}
-            onChange={(e) => setSaleDate(e.target.value)}
-            onBlur={() => saveMeta()} />
-        </div>
-        <div className="field">
-          <label htmlFor="schoolReturnDate">Return Date</label>
-          <input
-            id="schoolReturnDate"
-            type="date"
-            value={returnDate}
-            disabled={!selectedAgentId}
-            onChange={(e) => setReturnDate(e.target.value)}
-            onBlur={() => saveMeta()} />
         </div>
         <div className="tabs">
           {LIST_TABS.map(t => (
@@ -550,6 +620,21 @@ export default function SchoolModule({ setStatus }) {
         <span className="status">
           {loading ? 'Loading...' : `${filtered.length} schools`}
           {duplicateIds.size > 0 && <span style={{ color: '#b00020', fontWeight: 'bold' }}> — {duplicateIds.size} duplicate rows highlighted in red</span>}
+          {selectedIds.size > 0 && (
+            <span style={{ color: '#1f4e78', fontWeight: 'bold' }}>
+              {' '}— {selectedIds.size} row{selectedIds.size > 1 ? 's' : ''} selected (Export will use only these)
+              <label style={{ marginLeft: 10, fontWeight: 'normal', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={showSelectedOnly}
+                  onChange={(e) => setShowSelectedOnly(e.target.checked)}
+                  style={{ marginRight: 4 }}
+                />
+                Show selected only
+              </label>
+              <button type="button" className="secondary" style={{ marginLeft: 6, padding: '2px 6px', fontSize: 11 }} onClick={clearSelection}>Clear</button>
+            </span>
+          )}
         </span>
       </section>
 
@@ -558,6 +643,11 @@ export default function SchoolModule({ setStatus }) {
           <table className="grid school-grid">
             <thead>
               <tr>
+                <th className="select-col">
+                  {/* Row-selection "select all" — same idea as the Columns picker, but for
+                      rows: checks/unchecks every row currently shown by the search filter. */}
+                  <input type="checkbox" checked={allFilteredSelected} onChange={toggleSelectAllFiltered} title="Select all (filtered) rows" />
+                </th>
                 <th>S.N.</th>
                 {displayColumns.map(([field, label]) => <th key={field}>{label}</th>)}
                 <th></th>
@@ -577,11 +667,15 @@ export default function SchoolModule({ setStatus }) {
                   isDuplicate={duplicateIds.has(school.id)}
                   setCellRef={setCellRef}
                   handleCellKeyDown={handleCellKeyDown}
+                  onOpenVisits={() => setVisitEditorId(school.id)}
+                  isSelected={selectedIds.has(school.id)}
+                  onToggleSelected={() => toggleRowSelected(school.id)}
                 />
               ))}
             </tbody>
             <tfoot>
               <tr>
+                <td></td>
                 <td>TOTAL:-</td>
                 {displayColumns.map(([field]) => (
                   <td key={field}>{totals[field] !== undefined ? totals[field] : ''}</td>
@@ -600,11 +694,73 @@ export default function SchoolModule({ setStatus }) {
           <button className="secondary" disabled={safePage >= totalPages} onClick={() => setPage(totalPages)}>Last »</button>
         </div>
       </div>
+
+      {visitEditorSchool && (
+        <VisitDialog
+          school={visitEditorSchool}
+          onClose={() => setVisitEditorId(null)}
+          onSave={(visits) => saveVisits(visitEditorSchool.id, visits)}
+        />
+      )}
+
+      {showExportDialog && (
+        <ExportBoardDialog
+          boardOptions={boardOptions}
+          selected={exportBoards}
+          onToggle={toggleExportBoard}
+          onSelectAll={() => setExportBoards(new Set(boardOptions))}
+          onClearAll={() => setExportBoards(new Set())}
+          onClose={() => setShowExportDialog(false)}
+          onConfirm={confirmExportDialog}
+        />
+      )}
     </>
   );
 }
 
-function SchoolRow({ school, index, rowIndex, columns, updateLocal, queueSave, onDelete, isDuplicate, setCellRef, handleCellKeyDown }) {
+// Popup shown when "Export to Excel" is clicked and more than one Board value is in
+// use (e.g. MP, CG, CBSE) — lets the user check which Board(s) to include so they can
+// export a board-wise file instead of always getting everything.
+function ExportBoardDialog({ boardOptions, selected, onToggle, onSelectAll, onClearAll, onClose, onConfirm }) {
+  const dialogRef = useRef(null);
+
+  useEffect(() => {
+    const el = dialogRef.current;
+    if (el && !el.open) el.showModal();
+  }, []);
+
+  return (
+    <dialog ref={dialogRef} onClose={onClose} onCancel={onClose} style={{ width: 320 }}>
+      <h2>Export to Excel</h2>
+      <p style={{ fontSize: 12, color: '#666', margin: '0 0 10px' }}>
+        Choose which Board(s) to include:
+      </p>
+      {boardOptions.map(board => (
+        <label key={board} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0', fontSize: 13, cursor: 'pointer' }}>
+          {/* The global `dialog input { width:100% }` rule would otherwise stretch a
+              bare checkbox into a full-width bar — pin it to its natural checkbox size. */}
+          <input
+            type="checkbox"
+            checked={selected.has(board)}
+            onChange={() => onToggle(board)}
+            style={{ width: 16, height: 16, minWidth: 16, flex: '0 0 auto', margin: 0 }}
+          />
+          <span>{board}</span>
+        </label>
+      ))}
+      <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+        <button className="secondary" type="button" onClick={onSelectAll}>Select All</button>
+        <button className="secondary" type="button" onClick={onClearAll}>Clear All</button>
+      </div>
+      <div className="dialog-actions">
+        <button type="button" className="secondary" onClick={onClose}>Cancel</button>
+        <button type="button" onClick={onConfirm}>Export</button>
+      </div>
+    </dialog>
+  );
+}
+
+function SchoolRow({ school, index, rowIndex, columns, updateLocal, queueSave, onDelete, isDuplicate, setCellRef, handleCellKeyDown, onOpenVisits, isSelected, onToggleSelected }) {
   function handleChange(field, value) {
     updateLocal(school.id, field, value);
     queueSave(school.id);
@@ -612,10 +768,20 @@ function SchoolRow({ school, index, rowIndex, columns, updateLocal, queueSave, o
 
   return (
     <tr className={isDuplicate ? 'duplicate-row' : ''}>
+      <td className="select-col"><input type="checkbox" checked={isSelected} onChange={onToggleSelected} title="Select this row" /></td>
       <td>{index + 1}</td>
       {columns.map(([field], colIndex) => (
         <td key={field} className={TEXTAREA_FIELDS.has(field) ? 'text-left' : ''}>
-          {COMPUTED[field] ? (
+          {field === 'visits' ? (
+            <button
+              type="button"
+              className="secondary"
+              style={{ fontSize: 12, padding: '4px 8px', width: '100%' }}
+              onClick={onOpenVisits}
+            >
+              {getVisits(school).length ? `📅 ${getVisits(school).length} visit${getVisits(school).length > 1 ? 's' : ''}` : '+ Add visit'}
+            </button>
+          ) : COMPUTED[field] ? (
             <span className="computed-cell">{COMPUTED[field](school)}</span>
           ) : MONTH_FIELDS.has(field) ? (
             <select
@@ -659,5 +825,84 @@ function SchoolRow({ school, index, rowIndex, columns, updateLocal, queueSave, o
         <button type="button" className="delete-row-btn" title="Delete school" onClick={onDelete}>✕</button>
       </td>
     </tr>
+  );
+}
+
+// Popup for viewing/editing one school's visits. Each visit is just a Date + Remark,
+// added one at a time with "+ Add Visit" — no cap on how many a school can have.
+// Edits are local to the dialog until Save; Cancel (or closing the dialog) discards them.
+function VisitDialog({ school, onClose, onSave }) {
+  const dialogRef = useRef(null);
+  const [draft, setDraft] = useState(() => getVisits(school).map(v => ({ ...v })));
+
+  useEffect(() => {
+    const el = dialogRef.current;
+    if (el && !el.open) el.showModal();
+  }, []);
+
+  function updateVisit(idx, field, value) {
+    setDraft(prev => prev.map((v, i) => (i === idx ? { ...v, [field]: value } : v)));
+  }
+  function addVisit() {
+    setDraft(prev => [...prev, { date: '', remark: '' }]);
+  }
+  function removeVisit(idx) {
+    setDraft(prev => prev.filter((_, i) => i !== idx));
+  }
+  function handleSave() {
+    // Drop any still-empty rows (e.g. "+ Add Visit" clicked but never filled in).
+    onSave(draft.filter(v => (v.date || '').trim() || (v.remark || '').trim()));
+  }
+
+  return (
+    <dialog
+      ref={dialogRef}
+      onClose={onClose}
+      onCancel={onClose}
+      style={{ width: 560, maxWidth: '92vw' }}
+    >
+      <h2>School Visits{school.school_name_address ? ` — ${school.school_name_address}` : ''}</h2>
+      {draft.length === 0 && (
+        <p style={{ fontSize: 12, color: '#666', margin: '0 0 10px' }}>No visits logged yet.</p>
+      )}
+      {draft.map((v, idx) => (
+        <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
+          <span style={{ fontSize: 12, fontWeight: 'bold', width: 16, flex: '0 0 auto' }}>{idx + 1}.</span>
+          {/* Fixed-width date box, separate from the remark box below — each wrapped in
+              its own flex item so the global `dialog input { width:100% }` rule (which
+              would otherwise force both inputs to the same tiny/huge size depending on
+              flex-basis quirks) always resolves to "100% of this box" instead. */}
+          <div style={{ flex: '0 0 160px' }}>
+            <input
+              type="date"
+              value={v.date || ''}
+              onChange={(e) => updateVisit(idx, 'date', e.target.value)}
+              style={{ width: '100%', margin: 0 }}
+            />
+          </div>
+          <div style={{ flex: '1 1 auto', minWidth: 0 }}>
+            <input
+              type="text"
+              placeholder="Remark"
+              value={v.remark || ''}
+              onChange={(e) => updateVisit(idx, 'remark', e.target.value)}
+              style={{ width: '100%', margin: 0 }}
+            />
+          </div>
+          <button
+            type="button"
+            className="delete-row-btn"
+            title="Remove this visit"
+            onClick={() => removeVisit(idx)}
+            style={{ flex: '0 0 auto', width: 'auto', padding: '4px 8px' }}
+          >✕</button>
+        </div>
+      ))}
+      <div className="dialog-actions">
+        <button type="button" className="secondary" onClick={addVisit}>+ Add Visit</button>
+        <button type="button" className="secondary" onClick={onClose}>Cancel</button>
+        <button type="button" onClick={handleSave}>Save</button>
+      </div>
+    </dialog>
   );
 }

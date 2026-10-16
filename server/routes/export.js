@@ -3,6 +3,15 @@ const router = express.Router();
 const ExcelJS = require('exceljs');
 const { db } = require('../db');
 
+// Same options as the Type dropdown in client/src/Grid.jsx (BOOK_TYPE_GROUPS +
+// BOOK_TYPE_STANDALONE), flattened into one list — Excel's in-cell dropdown
+// (data validation) doesn't support grouped/optgroup lists, just a flat one.
+const BOOK_TYPE_OPTIONS = [
+  'Type A (Complete Set)', 'Type C (Task Book)', 'Eco. Task Copy', 'AL', 'All In One Term Book E/m.',
+  'Gyan Bodh', 'Skill Book', 'Practice Book', 'Work Book', 'Art & Craft', 'Play Group - A', 'Play Group - B',
+  'Special Set', 'Loose Book',
+];
+
 router.get('/challan-issue', async (req, res) => {
   const { agent_id, year } = req.query;
   if (!agent_id || !year) return res.status(400).json({ error: 'agent_id and year are required' });
@@ -23,12 +32,14 @@ router.get('/challan-issue', async (req, res) => {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('C.Book Challan Issue Details');
 
-  // Columns: S.N.(1) Date(2) Challan No.(3) Total Books(4) | Return Date(5) Return Challan No.(6) Return Qty(7) Remark(8)
-  const totalBooksCol = 4;
-  const returnDateCol = 5;
-  const returnChallanCol = 6;
-  const returnQtyCol = 7;
-  const remarkCol = 8;
+  // Columns: S.N.(1) Date(2) Type(3) Challan No.(4) Total Books(5) | Return Date(6) Return Challan No.(7) Return Qty(8) Remark(9)
+  const typeCol = 3;
+  const challanNoCol = 4;
+  const totalBooksCol = 5;
+  const returnDateCol = 6;
+  const returnChallanCol = 7;
+  const returnQtyCol = 8;
+  const remarkCol = 9;
   const lastCol = remarkCol;
 
   const colLetter = (n) => sheet.getColumn(n).letter;
@@ -55,7 +66,7 @@ router.get('/challan-issue', async (req, res) => {
 
   const headerRow = 4;
   const headers = [
-    [1, 'S.N.'], [2, 'Date'], [3, 'Challan No.'], [totalBooksCol, 'किताबों की संख्या'],
+    [1, 'S.N.'], [2, 'Date'], [typeCol, challans.find(c => c.book_type)?.book_type || 'Type'], [challanNoCol, 'Challan No.'], [totalBooksCol, 'किताबों की संख्या'],
     [returnDateCol, 'दिनांक'], [returnChallanCol, 'चालान क्रमांक'],
     [returnQtyCol, 'किताबों की संख्या'], [remarkCol, 'रिमार्क'],
   ];
@@ -75,7 +86,8 @@ router.get('/challan-issue', async (req, res) => {
     if (c) {
       sheet.getCell(r, 1).value = c.s_no ?? i + 1;
       sheet.getCell(r, 2).value = c.challan_date;
-      sheet.getCell(r, 3).value = c.challan_no;
+      sheet.getCell(r, typeCol).value = c.type_qty || '';
+      sheet.getCell(r, challanNoCol).value = c.challan_no;
       sheet.getCell(r, totalBooksCol).value = c.total_books || '';
     }
 
@@ -88,11 +100,22 @@ router.get('/challan-issue', async (req, res) => {
     r++;
   }
 
+  // Type column heading is the in-cell dropdown (Excel data validation); the cells
+  // below hold plain quantities. Header shows the chosen type name.
+  sheet.getCell(headerRow, typeCol).dataValidation = {
+    type: 'list',
+    allowBlank: true,
+    formulae: [`"${BOOK_TYPE_OPTIONS.join(',')}"`],
+    showErrorMessage: true,
+    errorTitle: 'Invalid Type',
+    error: 'Please pick a value from the dropdown list.',
+  };
+
   const firstDataRow = headerRow + 1;
   const lastDataRow = r - 1;
 
-  sheet.getCell(r, 3).value = 'TOTAL:-';
-  sheet.getCell(r, 3).font = { bold: true };
+  sheet.getCell(r, challanNoCol).value = 'TOTAL:-';
+  sheet.getCell(r, challanNoCol).font = { bold: true };
   if (lastDataRow >= firstDataRow) {
     const totalLetter = colLetter(totalBooksCol);
     sheet.getCell(r, totalBooksCol).value = { formula: `SUM(${totalLetter}${firstDataRow}:${totalLetter}${lastDataRow})` };
@@ -109,7 +132,8 @@ router.get('/challan-issue', async (req, res) => {
 
   sheet.getColumn(1).width = 8;
   sheet.getColumn(2).width = 14;
-  sheet.getColumn(3).width = 14;
+  sheet.getColumn(typeCol).width = 22;
+  sheet.getColumn(challanNoCol).width = 14;
   sheet.getColumn(totalBooksCol).width = 14;
   sheet.getColumn(returnDateCol).width = 14;
   sheet.getColumn(returnChallanCol).width = 14;
@@ -132,4 +156,4 @@ router.get('/challan-issue', async (req, res) => {
   res.end();
 });
 
-module.exports = router;    
+module.exports = router;

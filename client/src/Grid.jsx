@@ -1,11 +1,26 @@
-import { useRef, useCallback, useEffect } from 'react';
+import { useRef, useCallback, useEffect, useState } from 'react';
 import { api } from './api';
 
 // Column layout: S.N. is auto-computed from row position (not a stored/editable field —
-// see Row below), then Date(1) Challan No.(2) Total Books(3) | Return Date(4) Return
-// Challan No.(5) Return Qty(6) Remark(7). Column indices for inputs/refs/keyboard-nav
-// stay numbered this way (starting at 1) to avoid renumbering everything else.
-const COL_COUNT = 8;
+// see Row below), then Date(1) Type(2) Challan No.(3) Total Books(4) | Return Date(5)
+// Return Challan No.(6) Return Qty(7) Remark(8). Column indices for inputs/refs/keyboard-
+// nav stay numbered this way (starting at 1) to avoid renumbering everything else.
+const COL_COUNT = 9;
+
+// Book-type dropdown options, grouped exactly like the reference chart (नवबोध सेट /
+// ज्ञानबोध सेट), plus the two standalone sets. Stored as plain text on the challan
+// record (`book_type`) — this is just a pick-list, not a separate lookup table.
+const BOOK_TYPE_GROUPS = [
+  {
+    label: 'नवबोध सेट',
+    options: ['Type A (Complete Set)', 'Type C (Task Book)', 'Eco. Task Copy', 'AL', 'All In One Term Book E/m.'],
+  },
+  {
+    label: 'ज्ञानबोध सेट',
+    options: ['Gyan Bodh', 'Skill Book', 'Practice Book', 'Work Book', 'Art & Craft', 'Play Group - A', 'Play Group - B'],
+  },
+];
+const BOOK_TYPE_STANDALONE = ['Special Set', 'Loose Book'];
 
 // A row is flagged as a duplicate if its Challan No. matches another row's. S.N. can no
 // longer duplicate since it's always auto-computed from row position — see Row below —
@@ -36,6 +51,17 @@ export default function Grid({ rows, setRows, agentId, year, setStatus }) {
   // through during fast/paste-style entry across many rows in quick succession.
   const rowsRef = useRef(rows);
   useEffect(() => { rowsRef.current = rows; }, [rows]);
+
+  // The "Type" column heading is a dropdown: it says WHICH book type this column's
+  // numbers are (e.g. Type A). The cells below are plain quantity boxes (`type_qty`).
+  // The chosen type is saved as `book_type` on every challan so it survives reload.
+  const [colType, setColType] = useState('');
+  const colTypeRef = useRef('');
+  useEffect(() => {
+    if (colTypeRef.current) return;
+    const first = rows.find(r => r.challan?.book_type)?.challan.book_type;
+    if (first) { colTypeRef.current = first; setColType(first); }
+  }, [rows]);
 
   const duplicateFlags = computeDuplicateFlags(rows);
   const duplicateCount = duplicateFlags.filter(Boolean).length;
@@ -99,7 +125,7 @@ export default function Grid({ rows, setRows, agentId, year, setStatus }) {
   // Checks the DOM directly (not just saved row state) since inputs here are
   // uncontrolled — the user may have typed something but not yet blurred/saved it.
   function lastRowHasData(rowIndex) {
-    for (let c = 1; c <= 7; c++) {
+    for (let c = 1; c <= 8; c++) {
       const el = refsMap.current.get(`${rowIndex}-${c}`);
       if (el && el.value && el.value.trim() !== '') return true;
     }
@@ -158,13 +184,14 @@ export default function Grid({ rows, setRows, agentId, year, setStatus }) {
   function fieldColIndex(section, field) {
     if (section === 'challan') {
       if (field === 'challan_date') return 1;
-      if (field === 'challan_no') return 2;
-      if (field === 'total_books') return 3;
+      if (field === 'type_qty') return 2;
+      if (field === 'challan_no') return 3;
+      if (field === 'total_books') return 4;
     } else if (section === 'ret') {
-      if (field === 'return_date') return 4;
-      if (field === 'return_challan_no') return 5;
-      if (field === 'return_books_qty') return 6;
-      if (field === 'remark') return 7;
+      if (field === 'return_date') return 5;
+      if (field === 'return_challan_no') return 6;
+      if (field === 'return_books_qty') return 7;
+      if (field === 'remark') return 8;
     }
     return -1;
   }
@@ -172,6 +199,7 @@ export default function Grid({ rows, setRows, agentId, year, setStatus }) {
   async function saveSection(rowIndex, section) {
     const row = rowsRef.current[rowIndex];
     const getVal = (field) => {
+      if (field === 'book_type') return colTypeRef.current || '';
       const idx = fieldColIndex(section, field);
       const el = refsMap.current.get(`${rowIndex}-${idx}`);
       return el ? el.value.trim() : '';
@@ -179,9 +207,11 @@ export default function Grid({ rows, setRows, agentId, year, setStatus }) {
 
     if (section === 'challan') {
       const challan_date = getVal('challan_date');
+      const book_type = getVal('book_type');
+      const type_qty = getVal('type_qty');
       const challan_no = getVal('challan_no');
       const total_books = getVal('total_books');
-      const hasAnyData = challan_date || challan_no || total_books;
+      const hasAnyData = challan_date || type_qty || challan_no || total_books;
       if (!hasAnyData) return;
       if (!challan_date || !challan_no) return;
 
@@ -192,7 +222,7 @@ export default function Grid({ rows, setRows, agentId, year, setStatus }) {
       const normalized = challan_no.trim().toLowerCase();
       const dupRowIndex = rowsRef.current.findIndex((r, i) => i !== rowIndex && (r.challan?.challan_no || '').trim().toLowerCase() === normalized);
       if (dupRowIndex !== -1) {
-        const el = refsMap.current.get(`${rowIndex}-2`);
+        const el = refsMap.current.get(`${rowIndex}-3`);
         if (el) el.value = row.challan?.challan_no || '';
         setStatus(`Duplicate Challan No. "${challan_no}" — not saved`, true);
         window.alert(`Challan No. "${challan_no}" is already used in row ${dupRowIndex + 1}. Please use a different Challan No. — this entry was not saved.`);
@@ -203,7 +233,7 @@ export default function Grid({ rows, setRows, agentId, year, setStatus }) {
       // editable value, so it can never go out of sequence or duplicate.
       const payload = {
         agent_id: agentId, year,
-        s_no: rowIndex + 1, challan_date, challan_no,
+        s_no: rowIndex + 1, challan_date, book_type, type_qty: type_qty ? Number(type_qty) : 0, challan_no,
         total_books: total_books ? Number(total_books) : 0,
         items: [],
       };
@@ -252,6 +282,23 @@ export default function Grid({ rows, setRows, agentId, year, setStatus }) {
     setStatus('Saved');
   }
 
+  // Header "Type" dropdown: sets which book type this column is, on every saved challan.
+  function changeColumnType(value) {
+    colTypeRef.current = value;
+    setColType(value);
+    rowsRef.current.forEach((r) => {
+      if (!r.challan?.id) return;
+      const payload = { ...r.challan, book_type: value };
+      saveQueue.current = saveQueue.current
+        .then(() => api(`/challans/${r.challan.id}`, { method: 'PUT', body: JSON.stringify(payload) }))
+        .catch(err => setStatus(err.message, true));
+    });
+    const next = rowsRef.current.map(r => r.challan?.id ? { ...r, challan: { ...r.challan, book_type: value } } : r);
+    rowsRef.current = next;
+    setRows(next);
+    setStatus(value ? `Type set to "${value}"` : 'Type cleared');
+  }
+
   // ---------- Totals ----------
   let totalBooks = 0, totalReturn = 0;
   rows.forEach(row => {
@@ -270,12 +317,30 @@ export default function Grid({ rows, setRows, agentId, year, setStatus }) {
         <table className="grid">
           <thead>
             <tr className="group-row">
-              <th colSpan={4}>जावक</th>
+              <th colSpan={5}>जावक</th>
               <th colSpan={4} className="section-divider">आवक/वापसी</th>
             </tr>
             <tr>
               <th>S.N.</th>
               <th>Date</th>
+              <th>
+                <select
+                  value={colType}
+                  title="Pick the book type for this column — enter quantities below"
+                  onChange={(e) => changeColumnType(e.target.value)}
+                  style={{ width: '100%', fontWeight: 'bold' }}
+                >
+                  <option value="">Type ▾</option>
+                  {BOOK_TYPE_GROUPS.map(g => (
+                    <optgroup key={g.label} label={g.label}>
+                      {g.options.map(o => <option key={o} value={o}>{o}</option>)}
+                    </optgroup>
+                  ))}
+                  <optgroup label="Other">
+                    {BOOK_TYPE_STANDALONE.map(o => <option key={o} value={o}>{o}</option>)}
+                  </optgroup>
+                </select>
+              </th>
               <th>Challan No.</th>
               <th>किताबों की संख्या</th>
               <th className="section-divider">दिनांक</th>
@@ -301,7 +366,7 @@ export default function Grid({ rows, setRows, agentId, year, setStatus }) {
           </tbody>
           <tfoot>
             <tr>
-              <td colSpan={3}>TOTAL:-</td>
+              <td colSpan={4}>TOTAL:-</td>
               <td>{totalBooks || ''}</td>
               <td className="section-divider"></td>
               <td>TOTAL:-</td>
@@ -374,12 +439,13 @@ function Row({ row, rowIndex, setInputRef, handleKeyDown, queueSave, onDelete, i
     // it can never be typed differently or end up duplicated/out of sequence.
     <td key="sn">{rowIndex + 1}</td>,
     dateInput(row.challan?.challan_date ?? '', 'challan', 1),
-    textInput(row.challan?.challan_no ?? '', 'challan', 2),
-    numInput(row.challan?.total_books ?? '', 'challan', 3),
-    dateInput(row.ret?.return_date ?? '', 'ret', 4, 'section-divider'),
-    textInput(row.ret?.challan_no ?? '', 'ret', 5),
-    numInput(row.ret?.books_qty ?? '', 'ret', 6),
-    textInput(row.ret?.remark ?? '', 'ret', 7, '', 'text-left'),
+    numInput(row.challan?.type_qty || '', 'challan', 2),
+    textInput(row.challan?.challan_no ?? '', 'challan', 3),
+    numInput(row.challan?.total_books ?? '', 'challan', 4),
+    dateInput(row.ret?.return_date ?? '', 'ret', 5, 'section-divider'),
+    textInput(row.ret?.challan_no ?? '', 'ret', 6),
+    numInput(row.ret?.books_qty ?? '', 'ret', 7),
+    textInput(row.ret?.remark ?? '', 'ret', 8, '', 'text-left'),
     <td key="delete" className="delete-col">
       <button type="button" className="delete-row-btn" title="Delete row" onClick={onDelete}>✕</button>
     </td>,

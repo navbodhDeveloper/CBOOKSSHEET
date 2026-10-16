@@ -191,7 +191,9 @@
       "challan_date": "2026-08-06",
       "challan_no": "1234",
       "total_books": 500,
-      "items": []
+      "items": [],
+      "book_type": "Type A (Complete Set)",
+      "type_qty": 2000
     },
     {
       "id": 3,
@@ -404,7 +406,9 @@
       "challan_date": "2026-02-18",
       "challan_no": "2512",
       "total_books": 4000,
-      "items": []
+      "items": [],
+      "book_type": "Type A (Complete Set)",
+      "type_qty": 2200
     },
     {
       "id": 11,
@@ -414,7 +418,9 @@
       "challan_date": "2026-09-01",
       "challan_no": "8521",
       "total_books": 1000,
-      "items": []
+      "items": [],
+      "book_type": "Type A (Complete Set)",
+      "type_qty": 2000
     },
     {
       "id": 12,
@@ -424,7 +430,9 @@
       "challan_date": "2025-06-03",
       "challan_no": "7896",
       "total_books": 2500,
-      "items": []
+      "items": [],
+      "book_type": "Type A (Complete Set)",
+      "type_qty": 322
     },
     {
       "id": 13,
@@ -432,9 +440,11 @@
       "year": 2026,
       "s_no": 1,
       "challan_date": "2024-06-13",
-      "challan_no": "789654",
-      "total_books": 5801000,
-      "items": []
+      "challan_no": "5801000",
+      "total_books": 0,
+      "items": [],
+      "book_type": "Type A (Complete Set)",
+      "type_qty": 500
     },
     {
       "id": 14,
@@ -474,7 +484,9 @@
       "challan_date": "2025-06-20",
       "challan_no": "2345",
       "total_books": 20000,
-      "items": []
+      "items": [],
+      "book_type": "Practice Book",
+      "type_qty": 56
     },
     {
       "id": 18,
@@ -484,7 +496,9 @@
       "challan_date": "2024-10-25",
       "challan_no": "1234",
       "total_books": 52200,
-      "items": []
+      "items": [],
+      "book_type": "Practice Book",
+      "type_qty": 200
     },
     {
       "id": 19,
@@ -494,7 +508,9 @@
       "challan_date": "2026-06-09",
       "challan_no": "4563",
       "total_books": 100000,
-      "items": []
+      "items": [],
+      "book_type": "Practice Book",
+      "type_qty": 3332
     },
     {
       "id": 20,
@@ -504,7 +520,9 @@
       "challan_date": "2026-09-30",
       "challan_no": "7896",
       "total_books": 12000,
-      "items": []
+      "items": [],
+      "book_type": "Practice Book",
+      "type_qty": 2000
     }
   ],
   "returns": [
@@ -656,7 +674,7 @@
     "book_types": 14,
     "challans": 20,
     "returns": 15,
-    "schools": 1562,
+    "schools": 1563,
     "order_rows": 108,
     "order_row_years": 186,
     "parties": 22,
@@ -17918,9 +17936,9 @@
       "specimen_returned_2021": "",
       "specimen_returned_2022": "",
       "specimen_returned_2023": "",
-      "visit_1": "",
-      "visit_2": "",
-      "visit_3": "",
+      "visit_1": null,
+      "visit_2": null,
+      "visit_3": null,
       "order_2021": "",
       "vapasi_2021": "",
       "order_2022": "",
@@ -18065,9 +18083,9 @@
       "specimen_returned_2021": "",
       "specimen_returned_2022": "",
       "specimen_returned_2023": "",
-      "visit_1": "",
-      "visit_2": "",
-      "visit_3": "",
+      "visit_1": null,
+      "visit_2": null,
+      "visit_3": null,
       "order_2021": "",
       "vapasi_2021": "",
       "order_2022": "",
@@ -18077,7 +18095,17 @@
       "supplying_party": "",
       "discussion_2023": "",
       "discussion_2024": "",
-      "remark": ""
+      "remark": "",
+      "visits": [
+        {
+          "date": "2026-10-01",
+          "remark": "dasdadadad"
+        },
+        {
+          "date": "2026-10-08",
+          "remark": "fsdf sddfdfsd sfsdf"
+        }
+      ]
     },
     {
       "id": 598,
@@ -43934,6 +43962,39 @@
       "visit_1": "",
       "visit_2": "",
       "visit_3": "",
+      "supplying_party": "",
+      "discussion_2023": "",
+      "discussion_2024": "",
+      "remark": ""
+    },
+    {
+      "id": 1563,
+      "list_type": "MASTER",
+      "agent_id": 2,
+      "school_code": "125ABM1",
+      "school_name_address": "A.B.M. H.S.SCHOOL BAG DILKUSHA VIKAS NAGAR LALA LAJPAT RAI COLONY AISHBAGH",
+      "principal_name_mobile": "SMT RUBI KUNDU\n",
+      "grade": "B",
+      "medium": "E",
+      "board": "CG",
+      "specimen_give_month": "",
+      "book_delivery_month": "",
+      "specimen_given_2021": "",
+      "specimen_given_ayogya_2021": "",
+      "specimen_returned_2021": "",
+      "specimen_given_2022": "",
+      "specimen_given_ayogya_2022": "",
+      "specimen_returned_2022": "",
+      "specimen_given_2023": "",
+      "specimen_given_ayogya_2023": "",
+      "specimen_returned_2023": "",
+      "sale_details_2021": "",
+      "sale_return_2021": "",
+      "sale_details_2022": "",
+      "sale_return_2022": "",
+      "sale_details_2023": "",
+      "sale_return_2023": "",
+      "visits": [],
       "supplying_party": "",
       "discussion_2023": "",
       "discussion_2024": "",

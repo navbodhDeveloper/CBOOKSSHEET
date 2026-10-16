@@ -295,25 +295,6 @@ export default function PartyModule({ setStatus }) {
 
   const remarkColIndex = 2 + years.length * 2;
 
-  // Party-wise totals: same party name can appear on multiple rows (repeat orders),
-  // so group by trimmed/case-insensitive name and sum PER YEAR (not flattened) so the
-  // breakdown matches how the main grid and export show data — year by year.
-  const partyYearTotalsMap = {};
-  parties.forEach(p => {
-    const name = (p.party_name || '').trim();
-    if (!name) return;
-    const key = name.toLowerCase();
-    if (!partyYearTotalsMap[key]) {
-      partyYearTotalsMap[key] = { name, years: {} };
-      years.forEach(y => { partyYearTotalsMap[key].years[y] = { details: 0, ret: 0 }; });
-    }
-    years.forEach(y => {
-      partyYearTotalsMap[key].years[y].details += Number(p[`sale_details_${y}`]) || 0;
-      partyYearTotalsMap[key].years[y].ret += Number(p[`sale_return_${y}`]) || 0;
-    });
-  });
-  const partyYearTotalsList = Object.values(partyYearTotalsMap).sort((a, b) => a.name.localeCompare(b.name));
-
   return (
     <>
       <div className="module-title">Parties</div>
@@ -504,48 +485,6 @@ export default function PartyModule({ setStatus }) {
                   ))}
                 </tbody>
               </table>
-            </div>
-          )}
-
-          {partyYearTotalsList.length > 0 && (
-            <div className="summary-tables">
-              <h3>Party-wise Total</h3>
-              <div className="table-scroll">
-                <table className="grid summary-grid">
-                  <thead>
-                    <tr>
-                      <th rowSpan={2} style={{ minWidth: 220 }}>Party Name</th>
-                      {years.map(y => <th key={y} colSpan={3}>{y}</th>)}
-                    </tr>
-                    <tr>
-                      {years.map(y => (
-                        <Fragment key={y}>
-                          <th>Sale Details</th>
-                          <th>Sale Return</th>
-                          <th style={{ minWidth: 110, fontSize: '1.05em' }}>Net Sale</th>
-                        </Fragment>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {partyYearTotalsList.map(pt => (
-                      <tr key={pt.name}>
-                        <td className="text-left" style={{ whiteSpace: 'normal', wordBreak: 'break-word' }}>{pt.name}</td>
-                        {years.map(y => {
-                          const yd = pt.years[y];
-                          return (
-                            <Fragment key={y}>
-                              <td>{yd.details}</td>
-                              <td>{yd.ret}</td>
-                              <td style={{ fontSize: '1.1em', fontWeight: 'bold' }}>{yd.details - yd.ret}</td>
-                            </Fragment>
-                          );
-                        })}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
             </div>
           )}
         </>

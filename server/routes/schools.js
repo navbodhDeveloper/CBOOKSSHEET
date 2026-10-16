@@ -12,10 +12,16 @@ function cellToValue(v) {
     return '';
   }
   return v;
-}
+}  
 
 // Same column order as the export template (server/routes/export-schools.js).
-// null = computed column (Total Spec. Distribute / NET SPE / Net Sale), skipped on import since it's derived.
+// null = computed column (Total Spec. Distribute / NET SPE / Net Sale), skipped on
+// import since it's derived. 'visits' used to be 3 separate columns (visit_1/2/3) —
+// now it's ONE "School Visit Date" column holding however many visits the agent
+// logged. An imported file's single visits cell can't be reliably split back into
+// individual dated visits, so it's captured whole as one bootstrap visit entry (see
+// the special-case in the import loop below) — the user can split it into proper
+// dated entries afterward via the visit popup if they want to.
 const IMPORT_COLUMNS = [
   'school_code', 'school_name_address', 'principal_name_mobile', 'grade', 'medium', 'board',
   'specimen_give_month', 'book_delivery_month',
@@ -25,11 +31,13 @@ const IMPORT_COLUMNS = [
   'sale_details_2021', 'sale_return_2021', null,
   'sale_details_2022', 'sale_return_2022', null,
   'sale_details_2023', 'sale_return_2023', null,
-  'visit_1', 'visit_2', 'visit_3',
+  'visits',
   'supplying_party', 'discussion_2023', 'discussion_2024', 'remark',
 ];
 
-// All editable fields
+// All editable fields. visit_1/2/3 are kept here (though no longer edited directly —
+// see 'visits' below) purely so a save can still send them as null to clear out old
+// data once a school's visits have been migrated to the new array field.
 const FIELDS = [
   'agent_id',
   'school_code', 'school_name_address', 'principal_name_mobile',
@@ -41,7 +49,7 @@ const FIELDS = [
   'sale_details_2021', 'sale_return_2021',
   'sale_details_2022', 'sale_return_2022',
   'sale_details_2023', 'sale_return_2023',
-  'visit_1', 'visit_2', 'visit_3',
+  'visits', 'visit_1', 'visit_2', 'visit_3',
   'supplying_party', 'discussion_2023', 'discussion_2024', 'remark',
 ];
 
@@ -54,7 +62,7 @@ function pickFields(body) {
 }
 
 // Same School Code + School Name/Address already exists anywhere in this list
-// (Master/New/CBSE), regardless of which agent owns it.
+// (Master/New/CBSE), regardless of which agent owns it.  
 function findDuplicate(list_type, school_code, school_name_address, excludeId) {
   const code = (school_code || '').trim().toLowerCase();
   const name = (school_name_address || '').trim().toLowerCase();
@@ -64,20 +72,6 @@ function findDuplicate(list_type, school_code, school_name_address, excludeId) {
     s.list_type === list_type &&
     (s.school_code || '').trim().toLowerCase() === code &&
     (s.school_name_address || '').trim().toLowerCase() === name
-  );
-}
-
-// One common Sale Date / Return Date per (list_type, agent) sheet — NOT per school row.
-// Manual, no computed logic — stored exactly as entered. Defensive init since older
-// data blobs won't have this array yet.
-function ensureSchoolMetaArray() {
-  if (!db.data.school_sheet_meta) db.data.school_sheet_meta = [];
-}
-
-function findSchoolMeta(list_type, agent_id) {
-  ensureSchoolMetaArray();
-  return db.data.school_sheet_meta.find(m =>
-    m.list_type === list_type && String(m.agent_id) === String(agent_id)
   );
 }
 
@@ -95,34 +89,6 @@ router.get('/', (req, res) => {
     );
   }
   res.json(rows);
-});
-
-// GET /api/schools/meta?list_type=MASTER&agent_id=1
-// Registered BEFORE "/:id" below so "/meta" isn't swallowed by the ":id" pattern.
-router.get('/meta', (req, res) => {
-  const { list_type, agent_id } = req.query;
-  if (!list_type) return res.status(400).json({ error: 'list_type is required' });
-  if (!agent_id) return res.status(400).json({ error: 'agent_id is required' });
-  const meta = findSchoolMeta(list_type, agent_id);
-  res.json({ sale_date: meta?.sale_date || '', return_date: meta?.return_date || '' });
-});
-
-// PUT /api/schools/meta  { list_type, agent_id, sale_date, return_date }
-router.put('/meta', async (req, res) => {
-  const { list_type, agent_id, sale_date, return_date } = req.body;
-  if (!list_type) return res.status(400).json({ error: 'list_type is required' });
-  if (!agent_id) return res.status(400).json({ error: 'agent_id is required' });
-
-  ensureSchoolMetaArray();
-  let meta = findSchoolMeta(list_type, agent_id);
-  if (!meta) {
-    meta = { id: nextId('school_sheet_meta'), list_type, agent_id: Number(agent_id) };
-    db.data.school_sheet_meta.push(meta);
-  }
-  meta.sale_date = sale_date || '';
-  meta.return_date = return_date || '';
-  await db.write();
-  res.json(meta);
 });
 
 // GET /api/schools/:id
@@ -199,13 +165,22 @@ router.post('/import', async (req, res) => {
       const rec = { id: nextId('schools'), agent_id: Number(agent_id), list_type };
       IMPORT_COLUMNS.forEach((field, idx) => {
         if (!field) return;
-        rec[field] = cellToValue(row.getCell(idx + 2).value); // +2: col1=S.N., col2=first data field
+        const raw = cellToValue(row.getCell(idx + 2).value); // +2: col1=S.N., col2=first data field
+        if (field === 'visits') {
+          // The imported cell holds whatever text was in the "School Visit Date"
+          // column — it isn't reliably splittable back into individual dated
+          // visits, so it comes in as one bootstrap entry with no date.
+          const text = (raw || '').toString().trim();
+          rec.visits = text ? [{ date: '', remark: text }] : [];
+        } else {
+          rec[field] = raw;
+        }
       });
       db.data.schools.push(rec);
       imported++;
     });
 
-    await db.write(); 
+    await db.write();
     res.json({ imported, skipped });
   } catch (err) {
     res.status(400).json({ error: 'Could not read file: ' + err.message });

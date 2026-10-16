@@ -44,6 +44,30 @@ function dateRangeDisplay(saleDate, returnDate) {
   return s || r || '';
 }
 
+// Server-side mirror of client/src/SchoolModule.jsx's getVisits() — a school's visits
+// live in the 'visits' array field, but older records may still only have the legacy
+// visit_1/2/3 fields (no date, just a remark string), so those are read as a fallback.
+function getVisits(school) {
+  if (Array.isArray(school.visits)) return school.visits;
+  const legacy = [school.visit_1, school.visit_2, school.visit_3].filter(v => (v || '').toString().trim());
+  return legacy.map(v => ({ date: '', remark: String(v) }));
+}
+
+// Renders a school's visit list as one multi-line cell, e.g.:
+// 1) 2/08/2021 - met principal
+// 2) 15/09/2021 - follow-up visit
+function formatVisitsForExport(school) {
+  const visits = getVisits(school);
+  if (!visits.length) return '';
+  return visits
+    .map((v, i) => {
+      const d = formatDMY(v.date);
+      const label = d && v.remark ? `${d} - ${v.remark}` : (d || v.remark || '');
+      return `${i + 1}) ${label}`;
+    })
+    .join('\n');
+}
+
 // [field, header label, width, compute?] — computed columns use a string ID (matching
 // the same keys used in client/src/SchoolModule.jsx's COMPUTED object) instead of a
 // real DB field, so the `fields` query param (column picker selections from the UI)
@@ -88,9 +112,7 @@ const COLUMNS = [
   ['sale_return_2023', '2023 \nSale Return', 10],
   ['NET_SALE_2023', '2023\nNet \nSale', 10, s => (Number(s.sale_details_2023) || 0) - (Number(s.sale_return_2023) || 0)],
 
-  ['visit_1', 'School Visit Date / App Location - \nI', 16],
-  ['visit_2', 'School Visit Date / App Location - II', 16],
-  ['visit_3', 'School Visit Date / App Location- III', 16],
+  ['visits', 'School Visit Date', 24, s => formatVisitsForExport(s)],
 
   ['supplying_party', 'Supplying Party', 16],
   ['discussion_2023', 'Discussion 2023', 24],
@@ -99,7 +121,7 @@ const COLUMNS = [
 ];
 
 router.get('/school-list', async (req, res) => {
-  const { list_type, agent_id, fields } = req.query;
+  const { list_type, agent_id, fields, board, ids } = req.query;
   if (!list_type || !LIST_LABELS[list_type]) {
     return res.status(400).json({ error: 'valid list_type is required (MASTER, MASTER_NEW, or CBSE)' });
   }
@@ -115,6 +137,22 @@ router.get('/school-list', async (req, res) => {
 
   let schools = db.data.schools.filter(s => s.list_type === list_type);
   if (agent_id) schools = schools.filter(s => String(s.agent_id) === String(agent_id));
+
+  // Optional exact-row filter driven by the row checkboxes in the UI (like the Columns
+  // picker, but for rows). When present, this takes priority over the Board filter below
+  // — picking exact rows is more specific than picking a board.
+  if (ids) {
+    const wantedIds = new Set(ids.split(',').map(i => i.trim()).filter(Boolean));
+    schools = schools.filter(s => wantedIds.has(String(s.id)));
+  } else if (board) {
+    // Optional Board filter driven by the checkbox list shown when "Export to Excel" is
+    // clicked (e.g. only MP, or only CG + CBSE). No `board` param = every board, same as
+    // before this feature existed. Matched case-insensitively/trimmed against whatever
+    // free-text value was typed into the Board column.
+    const wantedBoards = new Set(board.split(',').map(b => b.trim().toLowerCase()).filter(Boolean));
+    schools = schools.filter(s => wantedBoards.has((s.board || '').trim().toLowerCase()));
+  }
+
   schools = schools.sort((a, b) => a.id - b.id);
 
   // One common Sale Date / Return Date for the whole sheet (list type + agent) — not
@@ -166,7 +204,14 @@ router.get('/school-list', async (req, res) => {
     activeColumns.forEach(([field, , , compute], idx) => {
       const val = compute ? compute(school) : school[field];
       if (val !== null && val !== undefined && val !== '') {
-        sheet.getCell(r, idx + 2).value = val;
+        const cell = sheet.getCell(r, idx + 2);
+        cell.value = val;
+        // The visits column can hold several numbered lines (one per visit) — wrap
+        // and top-align so multi-line entries are readable instead of overflowing
+        // into one squashed line.
+        if (field === 'visits') {
+          cell.alignment = { wrapText: true, vertical: 'top', horizontal: 'left' };
+        }
       }
     });
   });
@@ -180,7 +225,10 @@ router.get('/school-list', async (req, res) => {
   const totalRow = lastDataRow + 1;
   sheet.getCell(totalRow, 1).value = 'TOTAL:-';
   activeColumns.forEach(([field, , , compute], idx) => {
-    if (compute || NUMERIC_FIELDS.has(field)) {
+    // 'visits' has a compute function too, but it returns text (the formatted visit
+    // list), not a number — skip it here so the TOTAL row leaves it blank instead of
+    // showing a meaningless 0.
+    if (field !== 'visits' && (compute || NUMERIC_FIELDS.has(field))) {
       const total = schools.reduce((sum, s) => {
         const v = compute ? compute(s) : Number(s[field]) || 0;
         return sum + (Number(v) || 0);
@@ -203,7 +251,7 @@ router.get('/school-list', async (req, res) => {
         bottom: { style: 'thin' }, right: { style: 'thin' },
       };
     }
-  } 
+  }
 
   const filename = `${LIST_LABELS[list_type].replace(/[^\w]+/g, '_')}${isPartial ? '_partial' : ''}.xlsx`;
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
