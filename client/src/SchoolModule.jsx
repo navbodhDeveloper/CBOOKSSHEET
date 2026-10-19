@@ -87,7 +87,11 @@ const NUMERIC_FIELDS = new Set([
   'sale_details_2022', 'sale_return_2022',
   'sale_details_2023', 'sale_return_2023',
 ]);
-const TEXTAREA_FIELDS = new Set(['school_name_address', 'principal_name_mobile', 'discussion_2023', 'discussion_2024', 'remark']);
+const TEXTAREA_FIELDS = new Set(['school_name_address', 'principal_name_mobile', 'remark']);
+
+// Discussion 2023 / 2024 work like School Visit Date: a numbered list of entries added
+// one at a time in a popup — but each entry is a Remark only (no date).
+const DISCUSSION_FIELDS = new Set(['discussion_2023', 'discussion_2024']);
 const MONTH_FIELDS = new Set(['specimen_give_month', 'book_delivery_month']);
 
 // Same key definition used server-side for duplicate detection: School Code + School Name/Address
@@ -109,6 +113,15 @@ function getVisits(school) {
   return legacy.map(v => ({ date: '', remark: String(v) }));
 }
 
+// Reads a Discussion field as an array of { remark }. Older data (and Excel imports)
+// stored it as one plain text string — that shows up as a single entry, nothing is lost.
+function getDiscussion(school, field) {
+  const v = school[field];
+  if (Array.isArray(v)) return v;
+  const t = (v || '').toString().trim();
+  return t ? [{ remark: t }] : [];
+}
+
 export default function SchoolModule({ setStatus }) {
   const [listType, setListType] = useState('MASTER');
   const [schools, setSchools] = useState([]);
@@ -122,6 +135,8 @@ export default function SchoolModule({ setStatus }) {
   const cellRefs = useRef(new Map());
   // Which school's visit popup is open (by id), or null when none is open.
   const [visitEditorId, setVisitEditorId] = useState(null);
+  // Which school + Discussion field's remark popup is open ({ id, field }), or null.
+  const [discussionEditor, setDiscussionEditor] = useState(null);
   // Export-to-Excel Board filter popup: open/closed, and which Board values are
   // currently checked (keyed by the exact free-text value typed into the Board column,
   // e.g. "MP", "CG", "CBSE" — whatever values are actually in use).
@@ -390,6 +405,12 @@ export default function SchoolModule({ setStatus }) {
     setVisitEditorId(null);
   }
 
+  function saveDiscussion(schoolId, field, entries) {
+    updateLocal(schoolId, field, entries);
+    queueSave(schoolId);
+    setDiscussionEditor(null);
+  }
+
   function addBlankSchool() {
     const tempId = `new-${Date.now()}`;
     const blank = { id: tempId, list_type: listType, agent_id: selectedAgentId };
@@ -521,6 +542,7 @@ export default function SchoolModule({ setStatus }) {
   }
 
   const visitEditorSchool = visitEditorId !== null ? schools.find(s => s.id === visitEditorId) : null;
+  const discussionSchool = discussionEditor ? schools.find(s => s.id === discussionEditor.id) : null;
 
   return (
     <>
@@ -668,6 +690,7 @@ export default function SchoolModule({ setStatus }) {
                   setCellRef={setCellRef}
                   handleCellKeyDown={handleCellKeyDown}
                   onOpenVisits={() => setVisitEditorId(school.id)}
+                  onOpenDiscussion={(field) => setDiscussionEditor({ id: school.id, field })}
                   isSelected={selectedIds.has(school.id)}
                   onToggleSelected={() => toggleRowSelected(school.id)}
                 />
@@ -700,6 +723,16 @@ export default function SchoolModule({ setStatus }) {
           school={visitEditorSchool}
           onClose={() => setVisitEditorId(null)}
           onSave={(visits) => saveVisits(visitEditorSchool.id, visits)}
+        />
+      )}
+
+      {discussionSchool && (
+        <DiscussionDialog
+          school={discussionSchool}
+          field={discussionEditor.field}
+          title={COLUMNS.find(([f]) => f === discussionEditor.field)?.[1] || 'Discussion'}
+          onClose={() => setDiscussionEditor(null)}
+          onSave={(entries) => saveDiscussion(discussionSchool.id, discussionEditor.field, entries)}
         />
       )}
 
@@ -760,7 +793,7 @@ function ExportBoardDialog({ boardOptions, selected, onToggle, onSelectAll, onCl
   );
 }
 
-function SchoolRow({ school, index, rowIndex, columns, updateLocal, queueSave, onDelete, isDuplicate, setCellRef, handleCellKeyDown, onOpenVisits, isSelected, onToggleSelected }) {
+function SchoolRow({ school, index, rowIndex, columns, updateLocal, queueSave, onDelete, isDuplicate, setCellRef, handleCellKeyDown, onOpenVisits, onOpenDiscussion, isSelected, onToggleSelected }) {
   function handleChange(field, value) {
     updateLocal(school.id, field, value);
     queueSave(school.id);
@@ -780,6 +813,17 @@ function SchoolRow({ school, index, rowIndex, columns, updateLocal, queueSave, o
               onClick={onOpenVisits}
             >
               {getVisits(school).length ? `📅 ${getVisits(school).length} visit${getVisits(school).length > 1 ? 's' : ''}` : '+ Add visit'}
+            </button>
+          ) : DISCUSSION_FIELDS.has(field) ? (
+            <button
+              type="button"
+              className="secondary"
+              style={{ fontSize: 12, padding: '4px 8px', width: '100%' }}
+              onClick={() => onOpenDiscussion(field)}
+            >
+              {getDiscussion(school, field).length
+                ? `📝 ${getDiscussion(school, field).length} remark${getDiscussion(school, field).length > 1 ? 's' : ''}`
+                : '+ Add remark'}
             </button>
           ) : COMPUTED[field] ? (
             <span className="computed-cell">{COMPUTED[field](school)}</span>
@@ -828,8 +872,9 @@ function SchoolRow({ school, index, rowIndex, columns, updateLocal, queueSave, o
   );
 }
 
-// Popup for viewing/editing one school's visits. Each visit is just a Date + Remark,
-// added one at a time with "+ Add Visit" — no cap on how many a school can have.
+// Popup for viewing/editing one school's visits. Each visit is just a Date, added one
+// at a time with "+ Add Visit" — no cap on how many a school can have. (Older visits
+// that were saved with a remark keep it untouched and show it as a small grey note.)
 // Edits are local to the dialog until Save; Cancel (or closing the dialog) discards them.
 function VisitDialog({ school, onClose, onSave }) {
   const dialogRef = useRef(null);
@@ -840,11 +885,11 @@ function VisitDialog({ school, onClose, onSave }) {
     if (el && !el.open) el.showModal();
   }, []);
 
-  function updateVisit(idx, field, value) {
-    setDraft(prev => prev.map((v, i) => (i === idx ? { ...v, [field]: value } : v)));
+  function updateVisit(idx, value) {
+    setDraft(prev => prev.map((v, i) => (i === idx ? { ...v, date: value } : v)));
   }
   function addVisit() {
-    setDraft(prev => [...prev, { date: '', remark: '' }]);
+    setDraft(prev => [...prev, { date: '' }]);
   }
   function removeVisit(idx) {
     setDraft(prev => prev.filter((_, i) => i !== idx));
@@ -859,7 +904,7 @@ function VisitDialog({ school, onClose, onSave }) {
       ref={dialogRef}
       onClose={onClose}
       onCancel={onClose}
-      style={{ width: 560, maxWidth: '92vw' }}
+      style={{ width: 380, maxWidth: '92vw' }}
     >
       <h2>School Visits{school.school_name_address ? ` — ${school.school_name_address}` : ''}</h2>
       {draft.length === 0 && (
@@ -868,27 +913,21 @@ function VisitDialog({ school, onClose, onSave }) {
       {draft.map((v, idx) => (
         <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
           <span style={{ fontSize: 12, fontWeight: 'bold', width: 16, flex: '0 0 auto' }}>{idx + 1}.</span>
-          {/* Fixed-width date box, separate from the remark box below — each wrapped in
-              its own flex item so the global `dialog input { width:100% }` rule (which
-              would otherwise force both inputs to the same tiny/huge size depending on
-              flex-basis quirks) always resolves to "100% of this box" instead. */}
+          {/* Own flex item so the global `dialog input { width:100% }` rule resolves to
+              "100% of this box" instead of fighting the flex layout. */}
           <div style={{ flex: '0 0 160px' }}>
             <input
               type="date"
               value={v.date || ''}
-              onChange={(e) => updateVisit(idx, 'date', e.target.value)}
+              onChange={(e) => updateVisit(idx, e.target.value)}
               style={{ width: '100%', margin: 0 }}
             />
           </div>
-          <div style={{ flex: '1 1 auto', minWidth: 0 }}>
-            <input
-              type="text"
-              placeholder="Remark"
-              value={v.remark || ''}
-              onChange={(e) => updateVisit(idx, 'remark', e.target.value)}
-              style={{ width: '100%', margin: 0 }}
-            />
-          </div>
+          {v.remark ? (
+            <span style={{ fontSize: 11, color: '#888', flex: '1 1 auto', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={v.remark}>
+              {v.remark}
+            </span>
+          ) : <span style={{ flex: '1 1 auto' }} />}
           <button
             type="button"
             className="delete-row-btn"
@@ -900,6 +939,71 @@ function VisitDialog({ school, onClose, onSave }) {
       ))}
       <div className="dialog-actions">
         <button type="button" className="secondary" onClick={addVisit}>+ Add Visit</button>
+        <button type="button" className="secondary" onClick={onClose}>Cancel</button>
+        <button type="button" onClick={handleSave}>Save</button>
+      </div>
+    </dialog>
+  );
+}
+
+// Popup for one school's Discussion 2023 / 2024 entries. Same idea as VisitDialog, but
+// each numbered entry is a Remark only — no date.
+function DiscussionDialog({ school, field, title, onClose, onSave }) {
+  const dialogRef = useRef(null);
+  const [draft, setDraft] = useState(() => getDiscussion(school, field).map(d => ({ ...d })));
+
+  useEffect(() => {
+    const el = dialogRef.current;
+    if (el && !el.open) el.showModal();
+  }, []);
+
+  function updateEntry(idx, value) {
+    setDraft(prev => prev.map((d, i) => (i === idx ? { ...d, remark: value } : d)));
+  }
+  function addEntry() {
+    setDraft(prev => [...prev, { remark: '' }]);
+  }
+  function removeEntry(idx) {
+    setDraft(prev => prev.filter((_, i) => i !== idx));
+  }
+  function handleSave() {
+    onSave(draft.filter(d => (d.remark || '').trim()).map(d => ({ remark: d.remark.trim() })));
+  }
+
+  return (
+    <dialog
+      ref={dialogRef}
+      onClose={onClose}
+      onCancel={onClose}
+      style={{ width: 520, maxWidth: '92vw' }}
+    >
+      <h2>{title}{school.school_name_address ? ` — ${school.school_name_address}` : ''}</h2>
+      {draft.length === 0 && (
+        <p style={{ fontSize: 12, color: '#666', margin: '0 0 10px' }}>No remarks yet.</p>
+      )}
+      {draft.map((d, idx) => (
+        <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
+          <span style={{ fontSize: 12, fontWeight: 'bold', width: 16, flex: '0 0 auto' }}>{idx + 1}.</span>
+          <div style={{ flex: '1 1 auto', minWidth: 0 }}>
+            <input
+              type="text"
+              placeholder="Remark"
+              value={d.remark || ''}
+              onChange={(e) => updateEntry(idx, e.target.value)}
+              style={{ width: '100%', margin: 0 }}
+            />
+          </div>
+          <button
+            type="button"
+            className="delete-row-btn"
+            title="Remove this remark"
+            onClick={() => removeEntry(idx)}
+            style={{ flex: '0 0 auto', width: 'auto', padding: '4px 8px' }}
+          >✕</button>
+        </div>
+      ))}
+      <div className="dialog-actions">
+        <button type="button" className="secondary" onClick={addEntry}>+ Add Remark</button>
         <button type="button" className="secondary" onClick={onClose}>Cancel</button>
         <button type="button" onClick={handleSave}>Save</button>
       </div>

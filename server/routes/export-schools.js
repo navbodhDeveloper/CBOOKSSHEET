@@ -68,6 +68,22 @@ function formatVisitsForExport(school) {
     .join('\n');
 }
 
+// Discussion 2023 / 2024 are numbered remark lists (array of { remark }) — older data and
+// imported files hold a plain text string instead, which is passed through unchanged.
+function formatDiscussionForExport(school, field) {
+  const v = school[field];
+  if (!Array.isArray(v)) return v || '';
+  return v
+    .map(d => (d && d.remark ? String(d.remark).trim() : ''))
+    .filter(Boolean)
+    .map((t, i) => `${i + 1}) ${t}`)
+    .join('\n');
+}
+
+// Columns whose compute function returns text (not a number) — left blank in TOTAL row
+// and wrapped/top-aligned because they can hold several lines.
+const TEXT_COMPUTED = new Set(['visits', 'discussion_2023', 'discussion_2024']);
+
 // [field, header label, width, compute?] — computed columns use a string ID (matching
 // the same keys used in client/src/SchoolModule.jsx's COMPUTED object) instead of a
 // real DB field, so the `fields` query param (column picker selections from the UI)
@@ -115,8 +131,8 @@ const COLUMNS = [
   ['visits', 'School Visit Date', 24, s => formatVisitsForExport(s)],
 
   ['supplying_party', 'Supplying Party', 16],
-  ['discussion_2023', 'Discussion 2023', 24],
-  ['discussion_2024', 'Discussion 2024', 24],
+  ['discussion_2023', 'Discussion 2023', 24, s => formatDiscussionForExport(s, 'discussion_2023')],
+  ['discussion_2024', 'Discussion 2024', 24, s => formatDiscussionForExport(s, 'discussion_2024')],
   ['remark', 'Remark', 20],
 ];
 
@@ -209,7 +225,7 @@ router.get('/school-list', async (req, res) => {
         // The visits column can hold several numbered lines (one per visit) — wrap
         // and top-align so multi-line entries are readable instead of overflowing
         // into one squashed line.
-        if (field === 'visits') {
+        if (TEXT_COMPUTED.has(field)) {
           cell.alignment = { wrapText: true, vertical: 'top', horizontal: 'left' };
         }
       }
@@ -228,7 +244,7 @@ router.get('/school-list', async (req, res) => {
     // 'visits' has a compute function too, but it returns text (the formatted visit
     // list), not a number — skip it here so the TOTAL row leaves it blank instead of
     // showing a meaningless 0.
-    if (field !== 'visits' && (compute || NUMERIC_FIELDS.has(field))) {
+    if (!TEXT_COMPUTED.has(field) && (compute || NUMERIC_FIELDS.has(field))) {
       const total = schools.reduce((sum, s) => {
         const v = compute ? compute(s) : Number(s[field]) || 0;
         return sum + (Number(v) || 0);

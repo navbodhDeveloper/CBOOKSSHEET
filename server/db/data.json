@@ -17922,9 +17922,31 @@
       "order_2023": "",
       "vapasi_2023": "",
       "supplying_party": "",
-      "discussion_2023": "",
-      "discussion_2024": "",
-      "remark": ""
+      "discussion_2023": [
+        {
+          "remark": "this is remark one"
+        },
+        {
+          "remark": "this is remark two"
+        }
+      ],
+      "discussion_2024": [
+        {
+          "remark": "this is remark new one"
+        },
+        {
+          "remark": "this is remark new two"
+        }
+      ],
+      "remark": "",
+      "visits": [
+        {
+          "date": "2026-10-07"
+        },
+        {
+          "date": "2026-10-08"
+        }
+      ]
     },
     {
       "id": 560,

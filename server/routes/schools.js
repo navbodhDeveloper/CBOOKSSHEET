@@ -12,7 +12,7 @@ function cellToValue(v) {
     return '';
   }
   return v;
-}  
+}
 
 // Same column order as the export template (server/routes/export-schools.js).
 // null = computed column (Total Spec. Distribute / NET SPE / Net Sale), skipped on
@@ -62,7 +62,7 @@ function pickFields(body) {
 }
 
 // Same School Code + School Name/Address already exists anywhere in this list
-// (Master/New/CBSE), regardless of which agent owns it.  
+// (Master/New/CBSE), regardless of which agent owns it.
 function findDuplicate(list_type, school_code, school_name_address, excludeId) {
   const code = (school_code || '').trim().toLowerCase();
   const name = (school_name_address || '').trim().toLowerCase();
