@@ -66,7 +66,7 @@ router.get('/challan-issue', async (req, res) => {
 
   const headerRow = 4;
   const headers = [
-    [1, 'S.N.'], [2, 'Date'], [typeCol, challans.find(c => c.book_type)?.book_type || 'Type'], [challanNoCol, 'Challan No.'], [totalBooksCol, 'किताबों की संख्या'],
+    [1, 'S.N.'], [2, 'Date'], [typeCol, 'Type'], [challanNoCol, 'Challan No.'], [totalBooksCol, 'किताबों की संख्या'],
     [returnDateCol, 'दिनांक'], [returnChallanCol, 'चालान क्रमांक'],
     [returnQtyCol, 'किताबों की संख्या'], [remarkCol, 'रिमार्क'],
   ];
@@ -86,7 +86,7 @@ router.get('/challan-issue', async (req, res) => {
     if (c) {
       sheet.getCell(r, 1).value = c.s_no ?? i + 1;
       sheet.getCell(r, 2).value = c.challan_date;
-      sheet.getCell(r, typeCol).value = c.type_qty || '';
+      sheet.getCell(r, typeCol).value = c.book_type || '';
       sheet.getCell(r, challanNoCol).value = c.challan_no;
       sheet.getCell(r, totalBooksCol).value = c.total_books || '';
     }
@@ -100,16 +100,27 @@ router.get('/challan-issue', async (req, res) => {
     r++;
   }
 
-  // Type column heading is the in-cell dropdown (Excel data validation); the cells
-  // below hold plain quantities. Header shows the chosen type name.
-  sheet.getCell(headerRow, typeCol).dataValidation = {
-    type: 'list',
-    allowBlank: true,
-    formulae: [`"${BOOK_TYPE_OPTIONS.join(',')}"`],
-    showErrorMessage: true,
-    errorTitle: 'Invalid Type',
-    error: 'Please pick a value from the dropdown list.',
-  };
+  // Every Type cell gets its own in-cell dropdown (Excel data validation) — this column only.
+  // The list = built-in types + any custom type used on any challan. It lives on a hidden
+  // 'Lists' sheet so the list can be any length (an inline list is capped at 255 chars).
+  if (rowCount > 0) {
+    const customUsed = [...new Set((db.data.challans || []).map(c => c.book_type).filter(Boolean))]
+      .filter(t => !BOOK_TYPE_OPTIONS.includes(t));
+    const allTypes = [...BOOK_TYPE_OPTIONS, ...customUsed];
+    const listSheet = workbook.addWorksheet('Lists', { state: 'hidden' });
+    allTypes.forEach((t, i) => { listSheet.getCell(i + 1, 1).value = t; });
+    const typeListFormula = `Lists!$A$1:$A$${allTypes.length}`;
+    for (let row = headerRow + 1; row < headerRow + 1 + rowCount; row++) {
+      sheet.getCell(row, typeCol).dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: [typeListFormula],
+        showErrorMessage: true,
+        errorTitle: 'Invalid Type',
+        error: 'Please pick a value from the dropdown list.',
+      };
+    }
+  }
 
   const firstDataRow = headerRow + 1;
   const lastDataRow = r - 1;
@@ -148,7 +159,7 @@ router.get('/challan-issue', async (req, res) => {
       };
     }
   }
-
+ 
   const filename = `Challan_Issue_${agent.name.replace(/\s+/g, '_')}_${year}.xlsx`;
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -156,4 +167,4 @@ router.get('/challan-issue', async (req, res) => {
   res.end();
 });
 
-module.exports = router;
+module.exports = router;  

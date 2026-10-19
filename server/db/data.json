@@ -187,13 +187,13 @@
       "id": 2,
       "agent_id": 2,
       "year": 2026,
-      "s_no": 4,
+      "s_no": 3,
       "challan_date": "2026-08-06",
       "challan_no": "1234",
       "total_books": 500,
       "items": [],
       "book_type": "Type A (Complete Set)",
-      "type_qty": 2000
+      "type_qty": 0
     },
     {
       "id": 3,
@@ -399,30 +399,6 @@
       "items": []
     },
     {
-      "id": 10,
-      "agent_id": 2,
-      "year": 2026,
-      "s_no": 3,
-      "challan_date": "2026-02-18",
-      "challan_no": "2512",
-      "total_books": 4000,
-      "items": [],
-      "book_type": "Type A (Complete Set)",
-      "type_qty": 2200
-    },
-    {
-      "id": 11,
-      "agent_id": 2,
-      "year": 2026,
-      "s_no": 5,
-      "challan_date": "2026-09-01",
-      "challan_no": "8521",
-      "total_books": 1000,
-      "items": [],
-      "book_type": "Type A (Complete Set)",
-      "type_qty": 2000
-    },
-    {
       "id": 12,
       "agent_id": 2,
       "year": 2026,
@@ -432,7 +408,7 @@
       "total_books": 2500,
       "items": [],
       "book_type": "Type A (Complete Set)",
-      "type_qty": 322
+      "type_qty": 0
     },
     {
       "id": 13,
@@ -441,10 +417,10 @@
       "s_no": 1,
       "challan_date": "2024-06-13",
       "challan_no": "5801000",
-      "total_books": 0,
+      "total_books": 200,
       "items": [],
-      "book_type": "Type A (Complete Set)",
-      "type_qty": 500
+      "book_type": "Random",
+      "type_qty": 0
     },
     {
       "id": 14,
@@ -673,7 +649,7 @@
     "agents": 4,
     "book_types": 14,
     "challans": 20,
-    "returns": 15,
+    "returns": 19,
     "schools": 1563,
     "order_rows": 108,
     "order_row_years": 186,

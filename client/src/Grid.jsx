@@ -21,6 +21,9 @@ const BOOK_TYPE_GROUPS = [
   },
 ];
 const BOOK_TYPE_STANDALONE = ['Special Set', 'Loose Book'];
+const BASE_BOOK_TYPES = [...BOOK_TYPE_GROUPS.flatMap(g => g.options), ...BOOK_TYPE_STANDALONE];
+const ADD_CUSTOM_VALUE = '__add_custom__';
+const CUSTOM_TYPES_KEY = 'customBookTypes';
 
 // A row is flagged as a duplicate if its Challan No. matches another row's. S.N. can no
 // longer duplicate since it's always auto-computed from row position — see Row below —
@@ -52,16 +55,27 @@ export default function Grid({ rows, setRows, agentId, year, setStatus }) {
   const rowsRef = useRef(rows);
   useEffect(() => { rowsRef.current = rows; }, [rows]);
 
-  // The "Type" column heading is a dropdown: it says WHICH book type this column's
-  // numbers are (e.g. Type A). The cells below are plain quantity boxes (`type_qty`).
-  // The chosen type is saved as `book_type` on every challan so it survives reload.
-  const [colType, setColType] = useState('');
-  const colTypeRef = useRef('');
-  useEffect(() => {
-    if (colTypeRef.current) return;
-    const first = rows.find(r => r.challan?.book_type)?.challan.book_type;
-    if (first) { colTypeRef.current = first; setColType(first); }
-  }, [rows]);
+  // Custom Types the user added via "➕ Add custom type…". Remembered in this browser, and
+  // any Type already saved on a challan (even from another device) is shown too.
+  const [customTypes, setCustomTypes] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(CUSTOM_TYPES_KEY) || '[]'); } catch { return []; }
+  });
+  const extraTypes = Array.from(new Set([
+    ...customTypes,
+    ...rows.map(r => r.challan?.book_type).filter(Boolean),
+  ])).filter(t => !BASE_BOOK_TYPES.includes(t));
+
+  // Returns the final type name to select (existing match if it's a duplicate), or null.
+  function addCustomType(rawName) {
+    const name = (rawName || '').trim().replace(/\s+/g, ' ');
+    if (!name) return null;
+    const existing = [...BASE_BOOK_TYPES, ...extraTypes].find(t => t.toLowerCase() === name.toLowerCase());
+    if (existing) return existing;
+    const next = [...customTypes, name];
+    setCustomTypes(next);
+    try { localStorage.setItem(CUSTOM_TYPES_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+    return name;
+  }
 
   const duplicateFlags = computeDuplicateFlags(rows);
   const duplicateCount = duplicateFlags.filter(Boolean).length;
@@ -145,20 +159,63 @@ export default function Grid({ rows, setRows, agentId, year, setStatus }) {
     return true;
   }, [rows, setRows, setStatus]);
 
-  const deleteRow = useCallback(async (rowIndex) => {
-    const row = rows[rowIndex];
-    const hasData = row.challan || row.ret;
-    if (hasData && !window.confirm('Delete this row? This cannot be undone.')) return;
+  // Delete ONE side of a row — 'challan' (जावक) or 'ret' (आवक/वापसी) — without touching
+  // the other. The two sides are independent lists that are only zipped together by
+  // position (same as Sort by Date), so the remaining records on the deleted side move
+  // up one place to close the gap, exactly like they would after a reload.
+  const deleteSide = useCallback(async (rowIndex, side) => {
+    const cur = rowsRef.current;
+    const row = cur[rowIndex];
+    if (!row) return;
+    const rec = row[side];
+
+    // Fully empty row (nothing saved on either side): just remove it.
+    if (!rec && !row.challan && !row.ret) {
+      setRows(prev => prev.filter((_, i) => i !== rowIndex));
+      return;
+    }
+    if (!rec) return;
+
+    const label = side === 'challan' ? 'जावक' : 'आवक/वापसी';
+    if (!window.confirm(`Delete the ${label} record in row ${rowIndex + 1}? The other side of this row is NOT deleted. This cannot be undone.`)) return;
 
     try {
-      if (row.challan?.id) await api(`/challans/${row.challan.id}`, { method: 'DELETE' });
-      if (row.ret?.id) await api(`/challans/returns/${row.ret.id}`, { method: 'DELETE' });
-      setRows(prev => prev.filter((_, i) => i !== rowIndex));
-      setStatus('Row deleted');
+      if (side === 'challan') await api(`/challans/${rec.id}`, { method: 'DELETE' });
+      else await api(`/challans/returns/${rec.id}`, { method: 'DELETE' });
+
+      const challans = cur.map(r => r.challan);
+      const returns = cur.map(r => r.ret);
+      const list = side === 'challan' ? challans : returns;
+      list.splice(rowIndex, 1);
+      list.push(null);
+
+      let next = cur.map((r, i) => {
+        const changed = i >= rowIndex;
+        return {
+          rowKey: changed ? `row-del-${i}-${Date.now()}-${Math.random()}` : r.rowKey,
+          challan: challans[i] ?? null,
+          ret: returns[i] ?? null,
+        };
+      });
+      // Drop trailing rows that are now empty on both sides (keep at least one row).
+      while (next.length > 1 && !next[next.length - 1].challan && !next[next.length - 1].ret) next.pop();
+
+      rowsRef.current = next;
+      setRows(next);
+
+      // Records that moved up get their new position saved as S.N.
+      for (let i = rowIndex; i < next.length; i++) {
+        const sideRec = next[i][side];
+        if (!sideRec) continue;
+        const payload = { ...sideRec, s_no: i + 1 };
+        if (side === 'challan') await api(`/challans/${sideRec.id}`, { method: 'PUT', body: JSON.stringify(payload) });
+        else await api(`/challans/returns/${sideRec.id}`, { method: 'PUT', body: JSON.stringify(payload) });
+      }
+      setStatus(`${label} record deleted`);
     } catch (err) {
       setStatus(err.message, true);
     }
-  }, [rows, setRows, setStatus]);
+  }, [setRows, setStatus]);
 
   function handleKeyDown(e, rowIndex, colIndex) {
     if (e.key === 'Enter' || e.key === 'ArrowDown') {
@@ -184,7 +241,7 @@ export default function Grid({ rows, setRows, agentId, year, setStatus }) {
   function fieldColIndex(section, field) {
     if (section === 'challan') {
       if (field === 'challan_date') return 1;
-      if (field === 'type_qty') return 2;
+      if (field === 'book_type') return 2;
       if (field === 'challan_no') return 3;
       if (field === 'total_books') return 4;
     } else if (section === 'ret') {
@@ -199,7 +256,6 @@ export default function Grid({ rows, setRows, agentId, year, setStatus }) {
   async function saveSection(rowIndex, section) {
     const row = rowsRef.current[rowIndex];
     const getVal = (field) => {
-      if (field === 'book_type') return colTypeRef.current || '';
       const idx = fieldColIndex(section, field);
       const el = refsMap.current.get(`${rowIndex}-${idx}`);
       return el ? el.value.trim() : '';
@@ -208,10 +264,9 @@ export default function Grid({ rows, setRows, agentId, year, setStatus }) {
     if (section === 'challan') {
       const challan_date = getVal('challan_date');
       const book_type = getVal('book_type');
-      const type_qty = getVal('type_qty');
       const challan_no = getVal('challan_no');
       const total_books = getVal('total_books');
-      const hasAnyData = challan_date || type_qty || challan_no || total_books;
+      const hasAnyData = challan_date || book_type || challan_no || total_books;
       if (!hasAnyData) return;
       if (!challan_date || !challan_no) return;
 
@@ -233,7 +288,7 @@ export default function Grid({ rows, setRows, agentId, year, setStatus }) {
       // editable value, so it can never go out of sequence or duplicate.
       const payload = {
         agent_id: agentId, year,
-        s_no: rowIndex + 1, challan_date, book_type, type_qty: type_qty ? Number(type_qty) : 0, challan_no,
+        s_no: rowIndex + 1, challan_date, book_type, challan_no,
         total_books: total_books ? Number(total_books) : 0,
         items: [],
       };
@@ -282,23 +337,6 @@ export default function Grid({ rows, setRows, agentId, year, setStatus }) {
     setStatus('Saved');
   }
 
-  // Header "Type" dropdown: sets which book type this column is, on every saved challan.
-  function changeColumnType(value) {
-    colTypeRef.current = value;
-    setColType(value);
-    rowsRef.current.forEach((r) => {
-      if (!r.challan?.id) return;
-      const payload = { ...r.challan, book_type: value };
-      saveQueue.current = saveQueue.current
-        .then(() => api(`/challans/${r.challan.id}`, { method: 'PUT', body: JSON.stringify(payload) }))
-        .catch(err => setStatus(err.message, true));
-    });
-    const next = rowsRef.current.map(r => r.challan?.id ? { ...r, challan: { ...r.challan, book_type: value } } : r);
-    rowsRef.current = next;
-    setRows(next);
-    setStatus(value ? `Type set to "${value}"` : 'Type cleared');
-  }
-
   // ---------- Totals ----------
   let totalBooks = 0, totalReturn = 0;
   rows.forEach(row => {
@@ -317,32 +355,16 @@ export default function Grid({ rows, setRows, agentId, year, setStatus }) {
         <table className="grid">
           <thead>
             <tr className="group-row">
-              <th colSpan={5}>जावक</th>
+              <th colSpan={6}>जावक</th>
               <th colSpan={4} className="section-divider">आवक/वापसी</th>
             </tr>
             <tr>
               <th>S.N.</th>
               <th>Date</th>
-              <th>
-                <select
-                  value={colType}
-                  title="Pick the book type for this column — enter quantities below"
-                  onChange={(e) => changeColumnType(e.target.value)}
-                  style={{ width: '100%', fontWeight: 'bold' }}
-                >
-                  <option value="">Type ▾</option>
-                  {BOOK_TYPE_GROUPS.map(g => (
-                    <optgroup key={g.label} label={g.label}>
-                      {g.options.map(o => <option key={o} value={o}>{o}</option>)}
-                    </optgroup>
-                  ))}
-                  <optgroup label="Other">
-                    {BOOK_TYPE_STANDALONE.map(o => <option key={o} value={o}>{o}</option>)}
-                  </optgroup>
-                </select>
-              </th>
+              <th>Type</th>
               <th>Challan No.</th>
               <th>किताबों की संख्या</th>
+              <th></th>
               <th className="section-divider">दिनांक</th>
               <th>चालान क्रमांक</th>
               <th>किताबों की संख्या</th>
@@ -359,7 +381,10 @@ export default function Grid({ rows, setRows, agentId, year, setStatus }) {
                 setInputRef={setInputRef}
                 handleKeyDown={handleKeyDown}
                 queueSave={queueSave}
-                onDelete={() => deleteRow(rIdx)}
+                extraTypes={extraTypes}
+                addCustomType={addCustomType}
+                onDeleteChallan={() => deleteSide(rIdx, 'challan')}
+                onDeleteRet={() => deleteSide(rIdx, 'ret')}
                 isDuplicate={duplicateFlags[rIdx]}
               />
             ))}
@@ -368,6 +393,7 @@ export default function Grid({ rows, setRows, agentId, year, setStatus }) {
             <tr>
               <td colSpan={4}>TOTAL:-</td>
               <td>{totalBooks || ''}</td>
+              <td></td>
               <td className="section-divider"></td>
               <td>TOTAL:-</td>
               <td>{totalReturn || ''}</td>
@@ -385,7 +411,7 @@ export default function Grid({ rows, setRows, agentId, year, setStatus }) {
   );
 }
 
-function Row({ row, rowIndex, setInputRef, handleKeyDown, queueSave, onDelete, isDuplicate }) {
+function Row({ row, rowIndex, setInputRef, handleKeyDown, queueSave, extraTypes, addCustomType, onDeleteChallan, onDeleteRet, isDuplicate }) {
   const numInput = (defaultValue, section, colIndex, extraClass = '') => {
     const c = colIndex;
     return (
@@ -399,6 +425,50 @@ function Row({ row, rowIndex, setInputRef, handleKeyDown, queueSave, onDelete, i
           onKeyDown={(e) => handleKeyDown(e, rowIndex, c)}
           onBlur={() => queueSave(rowIndex, section)}
         />
+      </td>
+    );
+  };
+
+  // "Type" column — every row has its own dropdown (नवबोध सेट / ज्ञानबोध सेट groups,
+  // plus Special Set / Loose Book), stored as plain text (`book_type`) on the challan.
+  const typeSelect = (defaultValue, section, colIndex, extraClass = '') => {
+    const c = colIndex;
+    return (
+      <td className={extraClass} key={c}>
+        <select
+          defaultValue={defaultValue ?? ''}
+          ref={setInputRef(rowIndex, c)}
+          onKeyDown={(e) => handleKeyDown(e, rowIndex, c)}
+          onChange={(e) => {
+            const el = e.target;
+            if (el.value === ADD_CUSTOM_VALUE) {
+              const prev = row.challan?.book_type ?? '';
+              const name = window.prompt('Enter the new custom Type name:');
+              const finalName = name ? addCustomType(name) : null;
+              if (!finalName) { el.value = prev; return; }
+              // The new <option> only exists after React re-renders, so select it right after.
+              setTimeout(() => { el.value = finalName; queueSave(rowIndex, section); }, 0);
+              return;
+            }
+            queueSave(rowIndex, section);
+          }}
+        >
+          <option value=""></option>
+          {BOOK_TYPE_GROUPS.map(group => (
+            <optgroup key={group.label} label={group.label}>
+              {group.options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            </optgroup>
+          ))}
+          <optgroup label="Other">
+            {BOOK_TYPE_STANDALONE.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+          </optgroup>
+          {extraTypes.length > 0 && (
+            <optgroup label="Custom">
+              {extraTypes.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            </optgroup>
+          )}
+          <option value={ADD_CUSTOM_VALUE}>➕ Add custom type…</option>
+        </select>
       </td>
     );
   };
@@ -439,15 +509,24 @@ function Row({ row, rowIndex, setInputRef, handleKeyDown, queueSave, onDelete, i
     // it can never be typed differently or end up duplicated/out of sequence.
     <td key="sn">{rowIndex + 1}</td>,
     dateInput(row.challan?.challan_date ?? '', 'challan', 1),
-    numInput(row.challan?.type_qty || '', 'challan', 2),
+    typeSelect(row.challan?.book_type ?? '', 'challan', 2),
     textInput(row.challan?.challan_no ?? '', 'challan', 3),
     numInput(row.challan?.total_books ?? '', 'challan', 4),
+    // Delete ONLY the जावक record of this row.
+    <td key="delete-challan" className="delete-col">
+      {row.challan && (
+        <button type="button" className="delete-row-btn" title="Delete जावक record" onClick={onDeleteChallan}>✕</button>
+      )}
+    </td>,
     dateInput(row.ret?.return_date ?? '', 'ret', 5, 'section-divider'),
     textInput(row.ret?.challan_no ?? '', 'ret', 6),
     numInput(row.ret?.books_qty ?? '', 'ret', 7),
     textInput(row.ret?.remark ?? '', 'ret', 8, '', 'text-left'),
+    // Delete ONLY the आवक/वापसी record (or remove a completely empty row).
     <td key="delete" className="delete-col">
-      <button type="button" className="delete-row-btn" title="Delete row" onClick={onDelete}>✕</button>
+      {(row.ret || !row.challan) && (
+        <button type="button" className="delete-row-btn" title="Delete आवक/वापसी record" onClick={onDeleteRet}>✕</button>
+      )}
     </td>,
   ];
 
