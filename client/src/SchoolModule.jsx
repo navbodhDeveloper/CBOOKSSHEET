@@ -87,7 +87,7 @@ const NUMERIC_FIELDS = new Set([
   'sale_details_2022', 'sale_return_2022',
   'sale_details_2023', 'sale_return_2023',
 ]);
-const TEXTAREA_FIELDS = new Set(['school_name_address', 'principal_name_mobile', 'remark']);
+const TEXTAREA_FIELDS = new Set(['school_name_address', 'principal_name_mobile', 'remark' , 'supplying_party' ]);
 
 // Discussion 2023 / 2024 work like School Visit Date: a numbered list of entries added
 // one at a time in a popup — but each entry is a Remark only (no date).
@@ -975,22 +975,22 @@ function DiscussionDialog({ school, field, title, onClose, onSave }) {
       ref={dialogRef}
       onClose={onClose}
       onCancel={onClose}
-      style={{ width: 520, maxWidth: '92vw' }}
+      style={{ width: 560, maxWidth: '92vw' }}
     >
       <h2>{title}{school.school_name_address ? ` — ${school.school_name_address}` : ''}</h2>
       {draft.length === 0 && (
         <p style={{ fontSize: 12, color: '#666', margin: '0 0 10px' }}>No remarks yet.</p>
       )}
       {draft.map((d, idx) => (
-        <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
-          <span style={{ fontSize: 12, fontWeight: 'bold', width: 16, flex: '0 0 auto' }}>{idx + 1}.</span>
+        <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 10 }}>
+          <span style={{ fontSize: 12, fontWeight: 'bold', width: 16, flex: '0 0 auto', paddingTop: 8 }}>{idx + 1}.</span>
           <div style={{ flex: '1 1 auto', minWidth: 0 }}>
-            <input
-              type="text"
+            <textarea
+              rows={3}
               placeholder="Remark"
               value={d.remark || ''}
               onChange={(e) => updateEntry(idx, e.target.value)}
-              style={{ width: '100%', margin: 0 }}
+              style={{ width: '100%', margin: 0, boxSizing: 'border-box', resize: 'vertical', font: 'inherit', fontSize: 13, padding: '6px 8px', minHeight: 60 }}
             />
           </div>
           <button
