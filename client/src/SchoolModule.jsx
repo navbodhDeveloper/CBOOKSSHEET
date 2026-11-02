@@ -87,7 +87,7 @@ const NUMERIC_FIELDS = new Set([
   'sale_details_2022', 'sale_return_2022',
   'sale_details_2023', 'sale_return_2023',
 ]);
-const TEXTAREA_FIELDS = new Set(['school_name_address', 'principal_name_mobile', 'remark' , 'supplying_party' ]);
+const TEXTAREA_FIELDS = new Set(['school_name_address', 'principal_name_mobile', 'remark']);
 
 // Discussion 2023 / 2024 work like School Visit Date: a numbered list of entries added
 // one at a time in a popup — but each entry is a Remark only (no date).
@@ -122,8 +122,24 @@ function getDiscussion(school, field) {
   return t ? [{ remark: t }] : [];
 }
 
+// Deletes many records one-by-one on the server (10 at a time) using the normal
+// single-record DELETE routes, so it works with the backend exactly as it is today.
+// Returns how many failed.
+async function deleteMany(paths) {
+  let failed = 0;
+  for (let i = 0; i < paths.length; i += 10) {
+    const results = await Promise.allSettled(paths.slice(i, i + 10).map(p => api(p, { method: 'DELETE' })));
+    failed += results.filter(r => r.status === 'rejected').length;
+  }
+  return failed;
+}
+
 export default function SchoolModule({ setStatus }) {
   const [listType, setListType] = useState('MASTER');
+  // Each year has its own separate list of schools (same idea as the Challan sheet's Year).
+  const currentYear = new Date().getFullYear();
+  const yearOptions = [currentYear - 3, currentYear - 2, currentYear - 1, currentYear, currentYear + 1];
+  const [year, setYear] = useState(currentYear);
   const [schools, setSchools] = useState([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
@@ -259,11 +275,12 @@ export default function SchoolModule({ setStatus }) {
   const selectedAgent = agents.find(a => String(a.area_id) === String(selectedAreaId)) || null;
   const selectedAgentId = selectedAgent?.id ?? null;
 
-  const load = useCallback(async (lt, agentId) => {
+  const load = useCallback(async (lt, agentId, yr) => {
     setLoading(true);
     try {
       const qs = new URLSearchParams({ list_type: lt });
       if (agentId) qs.set('agent_id', agentId);
+      if (yr) qs.set('year', yr);
       const data = await api(`/schools?${qs.toString()}`);
       setSchools(data);
     } catch (err) {
@@ -273,7 +290,7 @@ export default function SchoolModule({ setStatus }) {
     }
   }, [setStatus]);
 
-  useEffect(() => { load(listType, selectedAgentId); setPage(1); }, [listType, selectedAgentId, load]);
+  useEffect(() => { load(listType, selectedAgentId, year); setPage(1); setSelectedIds(new Set()); setShowSelectedOnly(false); }, [listType, selectedAgentId, year, load]);
   useEffect(() => { setPage(1); }, [search, pageSize, showSelectedOnly]);
 
   const duplicateIds = (() => {
@@ -413,10 +430,29 @@ export default function SchoolModule({ setStatus }) {
 
   function addBlankSchool() {
     const tempId = `new-${Date.now()}`;
-    const blank = { id: tempId, list_type: listType, agent_id: selectedAgentId };
+    const blank = { id: tempId, list_type: listType, agent_id: selectedAgentId, year };
     for (const [field] of COLUMNS) blank[field] = field === 'visits' ? [] : '';
     setSchools(prev => [blank, ...prev]);
     setPage(1);
+  }
+
+  // DELETE ALL: removes every school in the list currently loaded (this list + area/agent),
+  // not just the ones visible on this page or matching the search, after a single warning.
+  async function deleteAllSchools() {
+    const saved = schools.filter(s => !String(s.id).startsWith('new-'));
+    if (!schools.length) { setStatus('Nothing to delete', true); return; }
+    const listName = { MASTER: 'School Master List', MASTER_NEW: 'School Master List (NEW)', CBSE: 'CBSE' }[listType] || listType;
+    if (!window.confirm(`⚠ DELETE ALL?\n\nThis will permanently delete ALL ${schools.length} schools in "${listName}" for the selected area/agent and year ${year}.\n\nThis cannot be undone.`)) return;
+    try {
+      setStatus('Deleting all schools...');
+      const failed = await deleteMany(saved.map(s => `/schools/${s.id}`));
+      setSelectedIds(new Set());
+      setShowSelectedOnly(false);
+      await load(listType, selectedAgentId, year);
+      setStatus(failed ? `Deleted with ${failed} failure(s) — remaining schools are shown` : 'All schools deleted', !!failed);
+    } catch (err) {
+      setStatus(err.message, true);
+    }
   }
 
   async function deleteSchool(id) {
@@ -456,6 +492,7 @@ export default function SchoolModule({ setStatus }) {
   function runExport(selectedBoards) {
     const qs = new URLSearchParams({ list_type: listType });
     if (selectedAgentId) qs.set('agent_id', selectedAgentId);
+    qs.set('year', year);
     // Only the checked columns are included, in the fixed canonical order (not the
     // order they were checked). A partial export is fine for viewing/printing/sharing,
     // but is NOT safe to re-import — Import expects every column in its fixed position.
@@ -511,10 +548,10 @@ export default function SchoolModule({ setStatus }) {
       });
       const result = await api('/schools/import', {
         method: 'POST',
-        body: JSON.stringify({ list_type: listType, agent_id: selectedAgentId, fileBase64: base64 }),
+        body: JSON.stringify({ list_type: listType, agent_id: selectedAgentId, year, fileBase64: base64 }),
       });
       setStatus(`Imported ${result.imported} schools${result.skipped ? `, skipped ${result.skipped} duplicates` : ''}`);
-      await load(listType, selectedAgentId);
+      await load(listType, selectedAgentId, year);
     } catch (err) {
       setStatus(err.message, true);
     } finally {
@@ -525,9 +562,9 @@ export default function SchoolModule({ setStatus }) {
   async function handleDedupe() {
     if (!window.confirm(`Remove duplicate and completely empty rows from "${listType}"? This keeps the first copy of each duplicate and deletes the rest, plus any row with no School Code and no School Name/Address. This cannot be undone.`)) return;
     try {
-      const result = await api('/schools/dedupe', { method: 'POST', body: JSON.stringify({ list_type: listType }) });
+      const result = await api('/schools/dedupe', { method: 'POST', body: JSON.stringify({ list_type: listType, year }) });
       setStatus(`Removed ${result.removed} duplicate rows`);
-      await load(listType, selectedAgentId);
+      await load(listType, selectedAgentId, year);
     } catch (err) {
       setStatus(err.message, true);
       window.alert(err.message);
@@ -565,6 +602,12 @@ export default function SchoolModule({ setStatus }) {
         <div className="field">
           <label>Agent</label>
           <input type="text" value={selectedAgent?.name || '—'} readOnly disabled />
+        </div>
+        <div className="field">
+          <label htmlFor="schoolYear">Year</label>
+          <select id="schoolYear" value={year} onChange={(e) => setYear(Number(e.target.value))}>
+            {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
         </div>
         <div className="tabs">
           {LIST_TABS.map(t => (
@@ -609,6 +652,7 @@ export default function SchoolModule({ setStatus }) {
         <button className="secondary" onClick={doExport}>⬇ Export to Excel</button>
         <button className="secondary" onClick={handleDedupe}>🧹 Clean Duplicates</button>
         <button className="secondary" onClick={sortByName}>⇅ Sort by School Name</button>
+        <button className="secondary" style={{ color: '#b00020', borderColor: '#b00020' }} onClick={deleteAllSchools} disabled={!schools.length}>🗑 Delete All</button>
         <div className="field" style={{ position: 'relative' }} ref={columnPickerRef}>
           <button className="secondary" onClick={() => setShowColumnPicker(v => !v)}>
             ☑ Columns ({displayColumns.length}/{COLUMNS.length})

@@ -49,9 +49,14 @@ const FIELDS = [
   'sale_details_2021', 'sale_return_2021',
   'sale_details_2022', 'sale_return_2022',
   'sale_details_2023', 'sale_return_2023',
-  'visits', 'visit_1', 'visit_2', 'visit_3',
+  'year', 'visits', 'visit_1', 'visit_2', 'visit_3',
   'supplying_party', 'discussion_2023', 'discussion_2024', 'remark',
 ];
+
+// Schools are kept per YEAR (like the Challan sheets). Schools saved before the Year
+// dropdown existed have no `year` — they are treated as belonging to LEGACY_YEAR.
+const LEGACY_YEAR = 2026;
+function schoolYear(s) { return Number(s.year) || LEGACY_YEAR; }
 
 function pickFields(body) {
   const out = {};
@@ -63,13 +68,14 @@ function pickFields(body) {
 
 // Same School Code + School Name/Address already exists anywhere in this list
 // (Master/New/CBSE), regardless of which agent owns it.
-function findDuplicate(list_type, school_code, school_name_address, excludeId) {
+function findDuplicate(list_type, school_code, school_name_address, excludeId, year) {
   const code = (school_code || '').trim().toLowerCase();
   const name = (school_name_address || '').trim().toLowerCase();
   if (!code && !name) return null;
   return db.data.schools.find(s =>
     s.id !== excludeId &&
     s.list_type === list_type &&
+    schoolYear(s) === (Number(year) || LEGACY_YEAR) &&
     (s.school_code || '').trim().toLowerCase() === code &&
     (s.school_name_address || '').trim().toLowerCase() === name
   );
@@ -77,8 +83,9 @@ function findDuplicate(list_type, school_code, school_name_address, excludeId) {
 
 // GET /api/schools?list_type=MASTER&search=abc&agent_id=1
 router.get('/', (req, res) => {
-  const { list_type, search, agent_id } = req.query;
+  const { list_type, search, agent_id, year } = req.query;
   let rows = db.data.schools;
+  if (year) rows = rows.filter(s => schoolYear(s) === Number(year));
   if (list_type) rows = rows.filter(s => s.list_type === list_type);
   if (agent_id) rows = rows.filter(s => String(s.agent_id) === String(agent_id));
   if (search) {
@@ -103,10 +110,11 @@ router.post('/', async (req, res) => {
   const { list_type, school_code, school_name_address } = req.body;
   if (!list_type) return res.status(400).json({ error: 'list_type is required' });
 
-  const dup = findDuplicate(list_type, school_code, school_name_address, null);
-  if (dup) return res.status(409).json({ error: `Duplicate: a school with this exact School Code and Name already exists in this list (row #${db.data.schools.indexOf(dup) + 1}).` });
+  const dup = findDuplicate(list_type, school_code, school_name_address, null, req.body.year);
+  if (dup) return res.status(409).json({ error: `Duplicate: a school with this exact School Code and Name already exists in this list for this year (row #${db.data.schools.indexOf(dup) + 1}).` });
 
   const school = { id: nextId('schools'), list_type, ...pickFields(req.body) };
+  school.year = Number(req.body.year) || LEGACY_YEAR;
   db.data.schools.push(school);
   await db.write();
   res.status(201).json(school);
@@ -122,8 +130,8 @@ router.put('/:id', async (req, res) => {
   const school_code = req.body.school_code !== undefined ? req.body.school_code : school.school_code;
   const school_name_address = req.body.school_name_address !== undefined ? req.body.school_name_address : school.school_name_address;
 
-  const dup = findDuplicate(list_type, school_code, school_name_address, id);
-  if (dup) return res.status(409).json({ error: `Duplicate: a school with this exact School Code and Name already exists in this list (row #${db.data.schools.indexOf(dup) + 1}).` });
+  const dup = findDuplicate(list_type, school_code, school_name_address, id, req.body.year !== undefined ? req.body.year : school.year);
+  if (dup) return res.status(409).json({ error: `Duplicate: a school with this exact School Code and Name already exists in this list for this year (row #${db.data.schools.indexOf(dup) + 1}).` });
 
   Object.assign(school, pickFields(req.body));
   await db.write();
@@ -140,7 +148,7 @@ router.delete('/:id', async (req, res) => {
 
 // POST /api/schools/import  { list_type, agent_id, fileBase64 }
 router.post('/import', async (req, res) => {
-  const { list_type, agent_id, fileBase64 } = req.body;
+  const { list_type, agent_id, fileBase64, year } = req.body;
   if (!list_type) return res.status(400).json({ error: 'list_type is required' });
   if (!agent_id) return res.status(400).json({ error: 'agent_id is required — select an area/agent first' });
   if (!fileBase64) return res.status(400).json({ error: 'fileBase64 is required' });
@@ -160,9 +168,9 @@ router.post('/import', async (req, res) => {
       if (!name) return;
 
       const code = cellToValue(row.getCell(2).value);
-      if (findDuplicate(list_type, code, name, null)) { skipped++; return; }
+      if (findDuplicate(list_type, code, name, null, year)) { skipped++; return; }
 
-      const rec = { id: nextId('schools'), agent_id: Number(agent_id), list_type };
+      const rec = { id: nextId('schools'), agent_id: Number(agent_id), list_type, year: Number(year) || LEGACY_YEAR };
       IMPORT_COLUMNS.forEach((field, idx) => {
         if (!field) return;
         const raw = cellToValue(row.getCell(idx + 2).value); // +2: col1=S.N., col2=first data field
@@ -191,13 +199,14 @@ router.post('/import', async (req, res) => {
 // Removes: (1) rows with no School Code AND no School Name/Address — empty filler
 // rows, not real data; (2) duplicate School Code + Name pairs, keeping the first.
 router.post('/dedupe', async (req, res) => {
-  const { list_type } = req.body;
+  const { list_type, year } = req.body;
   if (!list_type) return res.status(400).json({ error: 'list_type is required' });
 
   const seen = new Map();
   const toRemove = [];
   for (const s of db.data.schools) {
     if (s.list_type !== list_type) continue;
+    if (year && schoolYear(s) !== Number(year)) continue;
     const code = (s.school_code || '').trim().toLowerCase();
     const name = (s.school_name_address || '').trim().toLowerCase();
 
@@ -205,8 +214,8 @@ router.post('/dedupe', async (req, res) => {
       toRemove.push(s.id);
       continue;
     }
- 
-    const key = `${code}|${name}`;
+
+    const key = `${schoolYear(s)}|${code}|${name}`;
     if (seen.has(key)) {
       toRemove.push(s.id);
     } else {

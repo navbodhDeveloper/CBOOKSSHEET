@@ -137,7 +137,7 @@ const COLUMNS = [
 ];
 
 router.get('/school-list', async (req, res) => {
-  const { list_type, agent_id, fields, board, ids } = req.query;
+  const { list_type, agent_id, fields, board, ids, year } = req.query;
   if (!list_type || !LIST_LABELS[list_type]) {
     return res.status(400).json({ error: 'valid list_type is required (MASTER, MASTER_NEW, or CBSE)' });
   }
@@ -153,6 +153,8 @@ router.get('/school-list', async (req, res) => {
 
   let schools = db.data.schools.filter(s => s.list_type === list_type);
   if (agent_id) schools = schools.filter(s => String(s.agent_id) === String(agent_id));
+  // Schools saved before the Year dropdown existed have no `year` — they count as 2026.
+  if (year) schools = schools.filter(s => (Number(s.year) || 2026) === Number(year));
 
   // Optional exact-row filter driven by the row checkboxes in the UI (like the Columns
   // picker, but for rows). When present, this takes priority over the Board filter below

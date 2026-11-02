@@ -25,6 +25,165 @@ const BASE_BOOK_TYPES = [...BOOK_TYPE_GROUPS.flatMap(g => g.options), ...BOOK_TY
 const ADD_CUSTOM_VALUE = '__add_custom__';
 const CUSTOM_TYPES_KEY = 'customBookTypes';
 
+// A challan's Type can now be MORE THAN ONE (tick several checkboxes). It is stored as one
+// plain text value on `book_type`, joined with ", " — e.g. "Type A (Complete Set), Skill Book".
+function parseTypes(v) {
+  return (v || '').toString().split(',').map(t => t.trim()).filter(Boolean);
+}
+
+// The Type cell: shows the ticked types; clicking opens a checkbox list (grouped like the
+// reference chart, + Custom types, + "Add custom type…"). Saves when the list is closed.
+// The trigger <button> doubles as the cell's ref — saveSection reads its `.value`, which is
+// kept equal to the joined selection (same way the other cells expose their value).
+function TypeMultiSelect({ value, extraTypes, addCustomType, innerRef, onKeyDown, onCommit }) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState(null);
+  const [sel, setSel] = useState(() => parseTypes(value));
+  const btnRef = useRef(null);
+  const popRef = useRef(null);
+  const changed = useRef(false);
+  const selRef = useRef(sel);
+  selRef.current = sel;
+
+  const allTypes = [...BASE_BOOK_TYPES, ...extraTypes];
+  const order = (list) => [...list].sort((a, b) => {
+    const ia = allTypes.indexOf(a), ib = allTypes.indexOf(b);
+    return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+  });
+  const joined = order(sel).join(', ');
+
+  const setRefs = (el) => {
+    btnRef.current = el;
+    innerRef(el);
+    if (el) el.value = joined;
+  };
+
+  function openPopup() {
+    const r = btnRef.current.getBoundingClientRect();
+    const maxH = Math.min(window.innerHeight * 0.6, 420);
+    const top = r.bottom + 2 + maxH > window.innerHeight ? Math.max(8, window.innerHeight - maxH - 8) : r.bottom + 2;
+    setPos({ top, left: Math.min(r.left, window.innerWidth - 270), maxH });
+    setOpen(true);
+  }
+
+  function close() {
+    setOpen(false);
+    if (changed.current) {
+      changed.current = false;
+      if (btnRef.current) btnRef.current.value = order(selRef.current).join(', ');
+      onCommit();
+    }
+  }
+  const closeRef = useRef(close);
+  closeRef.current = close;
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = (e) => {
+      if (popRef.current?.contains(e.target) || btnRef.current?.contains(e.target)) return;
+      closeRef.current();
+    };
+    const onKey = (e) => { if (e.key === 'Escape') closeRef.current(); };
+    const onScroll = (e) => { if (!popRef.current?.contains(e.target)) closeRef.current(); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    window.addEventListener('scroll', onScroll, true);
+    window.addEventListener('resize', onScroll);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+      window.removeEventListener('scroll', onScroll, true);
+      window.removeEventListener('resize', onScroll);
+    };
+  }, [open]);
+
+  function toggle(name) {
+    changed.current = true;
+    setSel(prev => (prev.includes(name) ? prev.filter(t => t !== name) : [...prev, name]));
+  }
+  function clearAll() {
+    changed.current = true;
+    setSel([]);
+  }
+  function handleAddCustom() {
+    const name = window.prompt('Enter the new custom Type name:');
+    const finalName = name ? addCustomType(name) : null;
+    if (!finalName) return;
+    changed.current = true;
+    setSel(prev => (prev.includes(finalName) ? prev : [...prev, finalName]));
+  }
+
+  // Checkboxes pinned to their natural size (same reason as the other dialogs: a global
+  // input { width:100% } style would otherwise stretch them into bars).
+  const boxStyle = { width: 16, height: 16, minWidth: 16, flex: '0 0 auto', margin: 0 };
+  const rowStyle = { display: 'flex', alignItems: 'center', gap: 8, padding: '4px 10px', fontSize: 13, cursor: 'pointer', textAlign: 'left' };
+  const groupStyle = { fontWeight: 'bold', fontSize: 12, padding: '6px 10px 2px', color: '#1f4e78', textAlign: 'left' };
+  const renderOption = (name) => (
+    <label key={name} style={rowStyle}>
+      <input type="checkbox" checked={sel.includes(name)} onChange={() => toggle(name)} style={boxStyle} />
+      <span>{name}</span>
+    </label>
+  );
+
+  return (
+    <>
+      <button
+        type="button"
+        ref={setRefs}
+        title={joined || 'Select type(s)'}
+        onClick={() => (open ? close() : openPopup())}
+        onKeyDown={(e) => {
+          if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); openPopup(); }
+          else onKeyDown(e);
+        }}
+        style={{
+          // The global `button` style is white text on a blue background — override it all so
+          // the cell looks like the other plain cells (dark text, no fill, no border).
+          width: '100%', background: 'transparent', color: '#222', border: 'none', borderRadius: 0, boxShadow: 'none',
+          margin: 0, font: 'inherit', fontSize: 13, fontWeight: 'normal', cursor: 'pointer', minHeight: 24,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4, padding: '2px 4px',
+        }}
+      >
+        <span style={{ flex: '1 1 auto', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {joined || '\u00a0'}
+        </span>
+        <span style={{ flex: '0 0 auto', fontSize: 10 }}>▾</span>
+      </button>
+      {open && pos && (
+        <div
+          ref={popRef}
+          style={{
+            position: 'fixed', top: pos.top, left: pos.left, width: 260, maxHeight: pos.maxH, overflowY: 'auto',
+            background: '#fff', border: '1px solid #999', borderRadius: 4, boxShadow: '0 4px 14px rgba(0,0,0,0.25)', zIndex: 1000,
+          }}
+        >
+          <div style={{ display: 'flex', gap: 8, padding: 8, borderBottom: '1px solid #ddd', position: 'sticky', top: 0, background: '#fff' }}>
+            <button type="button" className="secondary" onClick={clearAll}>Clear</button>
+            <button type="button" onClick={close}>Done</button>
+          </div>
+          {BOOK_TYPE_GROUPS.map(g => (
+            <div key={g.label}>
+              <div style={groupStyle}>{g.label}</div>
+              {g.options.map(renderOption)}
+            </div>
+          ))}
+          <div style={groupStyle}>Other</div>
+          {BOOK_TYPE_STANDALONE.map(renderOption)}
+          {extraTypes.length > 0 && (
+            <>
+              <div style={groupStyle}>Custom</div>
+              {extraTypes.map(renderOption)}
+            </>
+          )}
+          <div style={{ padding: 8, borderTop: '1px solid #ddd' }}>
+            <button type="button" className="secondary" onClick={handleAddCustom} style={{ width: '100%' }}>➕ Add custom type…</button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 // A row is flagged as a duplicate if its Challan No. matches another row's. S.N. can no
 // longer duplicate since it's always auto-computed from row position — see Row below —
 // so it's not part of this check anymore.
@@ -42,6 +201,18 @@ function computeDuplicateFlags(rows) {
     const cn = (row.challan?.challan_no || '').trim().toLowerCase();
     return cn && challanNoCounts.get(cn) > 1;
   });
+}
+
+// Deletes many records one-by-one on the server (10 at a time) using the normal
+// single-record DELETE routes, so it works with the backend exactly as it is today.
+// Returns how many failed.
+async function deleteMany(paths) {
+  let failed = 0;
+  for (let i = 0; i < paths.length; i += 10) {
+    const results = await Promise.allSettled(paths.slice(i, i + 10).map(p => api(p, { method: 'DELETE' })));
+    failed += results.filter(r => r.status === 'rejected').length;
+  }
+  return failed;
 }
 
 export default function Grid({ rows, setRows, agentId, year, setStatus }) {
@@ -62,12 +233,12 @@ export default function Grid({ rows, setRows, agentId, year, setStatus }) {
   });
   const extraTypes = Array.from(new Set([
     ...customTypes,
-    ...rows.map(r => r.challan?.book_type).filter(Boolean),
+    ...rows.flatMap(r => parseTypes(r.challan?.book_type)),
   ])).filter(t => !BASE_BOOK_TYPES.includes(t));
 
   // Returns the final type name to select (existing match if it's a duplicate), or null.
   function addCustomType(rawName) {
-    const name = (rawName || '').trim().replace(/\s+/g, ' ');
+    const name = (rawName || '').replace(/,/g, ' ').trim().replace(/\s+/g, ' ');
     if (!name) return null;
     const existing = [...BASE_BOOK_TYPES, ...extraTypes].find(t => t.toLowerCase() === name.toLowerCase());
     if (existing) return existing;
@@ -212,6 +383,29 @@ export default function Grid({ rows, setRows, agentId, year, setStatus }) {
         else await api(`/challans/returns/${sideRec.id}`, { method: 'PUT', body: JSON.stringify(payload) });
       }
       setStatus(`${label} record deleted`);
+    } catch (err) {
+      setStatus(err.message, true);
+    }
+  }, [setRows, setStatus]);
+
+  // DELETE ALL: removes every जावक and आवक/वापसी record on this sheet (this agent + year)
+  // in one go, after a single warning.
+  const deleteAll = useCallback(async () => {
+    const cur = rowsRef.current;
+    const paths = [];
+    cur.forEach(r => {
+      if (r.challan?.id) paths.push(`/challans/${r.challan.id}`);
+      if (r.ret?.id) paths.push(`/challans/returns/${r.ret.id}`);
+    });
+    if (!paths.length) { setStatus('Nothing to delete', true); return; }
+    if (!window.confirm(`⚠ DELETE ALL?\n\nThis will permanently delete ALL ${paths.length} records (both जावक and आवक/वापसी) on this sheet.\n\nThis cannot be undone.`)) return;
+    try {
+      setStatus('Deleting all records...');
+      const failed = await deleteMany(paths);
+      const blank = [{ rowKey: `row-new-${Date.now()}-${Math.random()}`, challan: null, ret: null }];
+      rowsRef.current = blank;
+      setRows(blank);
+      setStatus(failed ? `Deleted with ${failed} failure(s) — reload the sheet to check` : 'All records deleted', !!failed);
     } catch (err) {
       setStatus(err.message, true);
     }
@@ -406,6 +600,7 @@ export default function Grid({ rows, setRows, agentId, year, setStatus }) {
       <div className="row-actions">
         <button onClick={() => { if (addBlankRow()) setTimeout(() => focusCell(rows.length, 1), 0); }}>+ Add Row</button>
         <button className="secondary" onClick={sortByDate}>⇅ Sort by Date</button>
+        <button className="secondary" style={{ color: '#b00020', borderColor: '#b00020' }} onClick={deleteAll}>🗑 Delete All</button>
       </div>
     </div>
   );
@@ -429,46 +624,20 @@ function Row({ row, rowIndex, setInputRef, handleKeyDown, queueSave, extraTypes,
     );
   };
 
-  // "Type" column — every row has its own dropdown (नवबोध सेट / ज्ञानबोध सेट groups,
-  // plus Special Set / Loose Book), stored as plain text (`book_type`) on the challan.
+  // "Type" column — tick one or more types (checkbox list). Stored as plain text on
+  // `book_type`, joined with ", ".
   const typeSelect = (defaultValue, section, colIndex, extraClass = '') => {
     const c = colIndex;
     return (
       <td className={extraClass} key={c}>
-        <select
-          defaultValue={defaultValue ?? ''}
-          ref={setInputRef(rowIndex, c)}
+        <TypeMultiSelect
+          value={defaultValue ?? ''}
+          extraTypes={extraTypes}
+          addCustomType={addCustomType}
+          innerRef={setInputRef(rowIndex, c)}
           onKeyDown={(e) => handleKeyDown(e, rowIndex, c)}
-          onChange={(e) => {
-            const el = e.target;
-            if (el.value === ADD_CUSTOM_VALUE) {
-              const prev = row.challan?.book_type ?? '';
-              const name = window.prompt('Enter the new custom Type name:');
-              const finalName = name ? addCustomType(name) : null;
-              if (!finalName) { el.value = prev; return; }
-              // The new <option> only exists after React re-renders, so select it right after.
-              setTimeout(() => { el.value = finalName; queueSave(rowIndex, section); }, 0);
-              return;
-            }
-            queueSave(rowIndex, section);
-          }}
-        >
-          <option value=""></option>
-          {BOOK_TYPE_GROUPS.map(group => (
-            <optgroup key={group.label} label={group.label}>
-              {group.options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-            </optgroup>
-          ))}
-          <optgroup label="Other">
-            {BOOK_TYPE_STANDALONE.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-          </optgroup>
-          {extraTypes.length > 0 && (
-            <optgroup label="Custom">
-              {extraTypes.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-            </optgroup>
-          )}
-          <option value={ADD_CUSTOM_VALUE}>➕ Add custom type…</option>
-        </select>
+          onCommit={() => queueSave(rowIndex, section)}
+        />
       </td>
     );
   };
@@ -531,4 +700,4 @@ function Row({ row, rowIndex, setInputRef, handleKeyDown, queueSave, extraTypes,
   ];
 
   return <tr className={isDuplicate ? 'duplicate-row' : ''}>{cells}</tr>;
-}
+}  

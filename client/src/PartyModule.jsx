@@ -151,6 +151,26 @@ export default function PartyModule({ setStatus }) {
     }
   }, [parties, selectedAgentId, selectedCycle, years, setStatus]);
 
+  // DELETE ALL: removes every party row on this sheet (this agent + cycle) in one go,
+  // after a single warning.
+  async function handleDeleteAll() {
+    const saved = parties.filter(p => p.id);
+    if (!parties.length) { setStatus('Nothing to delete', true); return; }
+    if (!window.confirm(`⚠ DELETE ALL?\n\nThis will permanently delete ALL ${parties.length} party rows on this sheet.\n\nThis cannot be undone.`)) return;
+    try {
+      setStatus('Deleting all rows...');
+      let failed = 0;
+      for (let i = 0; i < saved.length; i += 10) {
+        const results = await Promise.allSettled(saved.slice(i, i + 10).map(p => api(`/parties/${p.id}`, { method: 'DELETE' })));
+        failed += results.filter(r => r.status === 'rejected').length;
+      }
+      await load(selectedAgentId, selectedCycle);
+      setStatus(failed ? `Deleted with ${failed} failure(s) — remaining rows are shown` : 'All rows deleted', !!failed);
+    } catch (err) {
+      setStatus(err.message, true);
+    }
+  }
+
   async function handleCleanEmpty() {
     if (!window.confirm('Remove empty rows (no Party Name, no Remark, all amounts zero) from this sheet? This cannot be undone.')) return;
     try {
@@ -356,6 +376,7 @@ export default function PartyModule({ setStatus }) {
         <button onClick={addBlankRow} disabled={!loaded}>+ Add Row</button>
         <button className="secondary" disabled={!loaded} onClick={sortByName}>⇅ Sort by Name</button>
         <button className="secondary" disabled={!loaded} onClick={handleCleanEmpty}>🧹 Clean Empty Rows</button>
+        <button className="secondary" style={{ color: '#b00020', borderColor: '#b00020' }} disabled={!loaded || !parties.length} onClick={handleDeleteAll}>🗑 Delete All</button>
         <button className="secondary" disabled={!loaded} onClick={doExport}>⬇ Export to Excel</button>
       </section>
 

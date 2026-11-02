@@ -87,6 +87,7 @@ router.get('/challan-issue', async (req, res) => {
       sheet.getCell(r, 1).value = c.s_no ?? i + 1;
       sheet.getCell(r, 2).value = c.challan_date;
       sheet.getCell(r, typeCol).value = c.book_type || '';
+      sheet.getCell(r, typeCol).alignment = { wrapText: true, vertical: 'middle' };
       sheet.getCell(r, challanNoCol).value = c.challan_no;
       sheet.getCell(r, totalBooksCol).value = c.total_books || '';
     }
@@ -104,7 +105,7 @@ router.get('/challan-issue', async (req, res) => {
   // The list = built-in types + any custom type used on any challan. It lives on a hidden
   // 'Lists' sheet so the list can be any length (an inline list is capped at 255 chars).
   if (rowCount > 0) {
-    const customUsed = [...new Set((db.data.challans || []).map(c => c.book_type).filter(Boolean))]
+    const customUsed = [...new Set((db.data.challans || []).flatMap(c => (c.book_type || '').split(',').map(t => t.trim()).filter(Boolean)))]
       .filter(t => !BOOK_TYPE_OPTIONS.includes(t));
     const allTypes = [...BOOK_TYPE_OPTIONS, ...customUsed];
     const listSheet = workbook.addWorksheet('Lists', { state: 'hidden' });
@@ -115,9 +116,9 @@ router.get('/challan-issue', async (req, res) => {
         type: 'list',
         allowBlank: true,
         formulae: [typeListFormula],
-        showErrorMessage: true,
-        errorTitle: 'Invalid Type',
-        error: 'Please pick a value from the dropdown list.',
+        // A row can hold several types ("Type A (Complete Set), Skill Book"), which a
+        // single-pick list can't produce — so anything typed is allowed, the list is a helper.
+        showErrorMessage: false,
       };
     }
   }
@@ -143,7 +144,7 @@ router.get('/challan-issue', async (req, res) => {
 
   sheet.getColumn(1).width = 8;
   sheet.getColumn(2).width = 14;
-  sheet.getColumn(typeCol).width = 22;
+  sheet.getColumn(typeCol).width = 32;
   sheet.getColumn(challanNoCol).width = 14;
   sheet.getColumn(totalBooksCol).width = 14;
   sheet.getColumn(returnDateCol).width = 14;
@@ -159,7 +160,7 @@ router.get('/challan-issue', async (req, res) => {
       };
     }
   }
- 
+
   const filename = `Challan_Issue_${agent.name.replace(/\s+/g, '_')}_${year}.xlsx`;
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -167,4 +168,4 @@ router.get('/challan-issue', async (req, res) => {
   res.end();
 });
 
-module.exports = router;  
+module.exports = router;
