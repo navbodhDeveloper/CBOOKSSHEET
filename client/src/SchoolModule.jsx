@@ -377,12 +377,32 @@ export default function SchoolModule({ setStatus }) {
     else cellRefs.current.delete(key);
   };
 
+  function focusCell(el) {
+    if (!el) return;
+    el.focus();
+    if (el.tagName === 'INPUT' && typeof el.select === 'function') el.select();
+  }
+
   function handleCellKeyDown(e, rowIndex, colIndex) {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      const next = cellRefs.current.get(`${rowIndex + 1}-${colIndex}`);
-      if (next) next.focus();
+      focusCell(cellRefs.current.get(`${rowIndex + 1}-${colIndex}`));
+      return;
     }
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    const el = e.currentTarget;
+    const down = e.key === 'ArrowDown';
+    // In a multi-line box, arrows should move the cursor between lines first;
+    // only jump to the next/previous row when the cursor is already on the first/last line.
+    if (el.tagName === 'TEXTAREA') {
+      const v = el.value;
+      const pos = down ? el.selectionEnd : el.selectionStart;
+      const onEdgeLine = down ? v.indexOf('\n', pos) === -1 : v.lastIndexOf('\n', pos - 1) === -1;
+      if (!onEdgeLine) return;
+    }
+    e.preventDefault();
+    focusCell(cellRefs.current.get(`${rowIndex + (down ? 1 : -1)}-${colIndex}`));
   }
 
   // Reads from schoolsRef.current (always fresh) rather than closing over the
