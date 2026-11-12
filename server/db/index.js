@@ -47,7 +47,45 @@ const defaultData = {
   _seq: { regions: 0, areas: 0, agents: 0, book_types: 0, challans: 0, returns: 0, schools: 0, order_rows: 0, order_row_years: 0, parties: 0 },
 };
 
-const adapter = (UPSTASH_URL && UPSTASH_TOKEN) ? new UpstashAdapter() : new JSONFile(DB_PATH);
+// AWS / PostgreSQL: if DATABASE_URL is set, the same JSON blob is stored in one row of a
+// Postgres table (app_data). Every route keeps working unchanged. Takes priority over Upstash.
+const DATABASE_URL = process.env.DATABASE_URL;
+
+class PostgresAdapter {
+  constructor(url) {
+    const { Pool } = require('pg');
+    this.pool = new Pool({
+      connectionString: url,
+      ssl: process.env.PGSSL === 'true' ? { rejectUnauthorized: false } : false,
+      max: 5,
+    });
+    this.ready = this.pool.query(
+      `CREATE TABLE IF NOT EXISTS app_data (
+         key text PRIMARY KEY,
+         data jsonb NOT NULL,
+         updated_at timestamptz NOT NULL DEFAULT now()
+       )`
+    );
+  }
+  async read() {
+    await this.ready;
+    const r = await this.pool.query('SELECT data FROM app_data WHERE key = $1', [REDIS_KEY]);
+    return r.rows.length ? r.rows[0].data : null;
+  }
+  async write(data) {
+    await this.ready;
+    await this.pool.query(
+      `INSERT INTO app_data (key, data, updated_at) VALUES ($1, $2::jsonb, now())
+       ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data, updated_at = now()`,
+      [REDIS_KEY, JSON.stringify(data)]
+    );
+  }
+}
+
+const adapter = DATABASE_URL
+  ? new PostgresAdapter(DATABASE_URL)
+  : (UPSTASH_URL && UPSTASH_TOKEN) ? new UpstashAdapter() : new JSONFile(DB_PATH);
+console.log('Storage:', DATABASE_URL ? 'PostgreSQL (AWS)' : (UPSTASH_URL && UPSTASH_TOKEN) ? 'Upstash Redis' : 'local data.json');
 const db = new Low(adapter, defaultData);
 
 function nextId(collection) {
