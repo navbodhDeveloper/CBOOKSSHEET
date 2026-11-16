@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { api, API_BASE } from './api';
+import { api, downloadFile } from './api';
 
 const LIST_TABS = [
   { key: 'MASTER', label: 'School Master List' },
@@ -528,7 +528,7 @@ export default function SchoolModule({ setStatus }) {
       );
       if (!proceed) return;
     }
-    window.location.href = `${API_BASE}/api/export/school-list?${qs.toString()}`;
+    downloadFile(`/export/school-list?${qs.toString()}`).catch(err => setStatus(err.message, true));
   }
 
   function confirmExportDialog() {

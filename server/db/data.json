@@ -567,7 +567,8 @@
     "order_row_years": 186,
     "parties": 22,
     "party_sheet_meta": 1,
-    "school_sheet_meta": 1
+    "school_sheet_meta": 1,
+    "users": 2
   },
   "schools": [
     {
@@ -46691,5 +46692,30 @@
       "sale_date": "2026-06-01",
       "return_date": "2026-09-07"
     }
-  ]
+  ],
+  "users": [
+    {
+      "id": 1,
+      "username": "admin",
+      "role": "admin",
+      "active": true,
+      "password_hash": "214604f754615c70463ae22a28703d58:a2a28fdf459af2cf2c2debeb434d45ca686f2e980ba2f3daae680d064787692e48ed641bea7bb5d400094ad8feb83b674124696d2a78fcd9dc663cd8f588744b",
+      "token_version": 1,
+      "must_change": false,
+      "created_at": "2026-11-16T09:35:38.096Z",
+      "created_by": null
+    },
+    {
+      "id": 2,
+      "username": "user",
+      "role": "data_entry",
+      "active": true,
+      "password_hash": "9d30ed2531424851177314ec92fb9744:d51e52a1e8ccc93c75ca9c420787a686cfccc84a8542169bf1a1fa0b84156b06060bb0bed5e8bd87c3800a54cccaa7b4a7c6bdc31cdcf9951235eca26cf14adb",
+      "token_version": 0,
+      "must_change": false,
+      "created_at": "2026-11-16T09:39:15.497Z",
+      "created_by": "admin"
+    }
+  ],
+  "auth_secret": "dc6405b94b528b420faeacc25c04043c64a4d00b2d3351db2da5695ce591101ee2e035ae1ac435b77076cc14586dadf5"
 }

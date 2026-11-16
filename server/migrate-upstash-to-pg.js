@@ -26,7 +26,7 @@ if (!URL_ || !TOKEN || !DB_URL) {
 
   const pool = new Pool({ connectionString: DB_URL });
   await pool.query(`CREATE TABLE IF NOT EXISTS app_data (
-    key text PRIMARY KEY, data jsonb NOT NULL, updated_at timestamptz NOT NULL DEFAULT now())`);
+    key text PRIMARY KEY, data jsonb NOT NULL, updated_at timesta mptz NOT NULL DEFAULT now())`);
   await pool.query(
     `INSERT INTO app_data (key, data, updated_at) VALUES ($1, $2::jsonb, now())
      ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data, updated_at = now()`,
@@ -35,4 +35,4 @@ if (!URL_ || !TOKEN || !DB_URL) {
   const counts = Object.entries(data).filter(([, v]) => Array.isArray(v)).map(([k, v]) => `${k}: ${v.length}`);
   console.log('Copied OK ->', counts.join(', '));
   await pool.end();
-})().catch(e => { console.error(e); process.exit(1); });
+})().catch(e => { console.error(e); process.exit(1); });   

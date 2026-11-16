@@ -9,16 +9,26 @@ const exportPartiesRoutes = require('./routes/export-parties');
 const metaRoutes = require('./routes/meta');
 const challanRoutes = require('./routes/challans');
 const exportRoutes = require('./routes/export');
+const authRoutes = require('./routes/auth');
+const userRoutes = require('./routes/users');
+const { requireAuth, setupAuth } = require('./auth');
 // const orderDetailRoutes = require('./routes/order-details');
 // const exportOrderDetailRoutes = require('./routes/export-order-details');
 
 async function start() {
   await init(); // load/seed the JSON database
+  await setupAuth(); // users table + first admin (see auth.js)
 
   const app = express();
-  app.use(cors());
+  app.set('trust proxy', 1); // behind Caddy: use the real visitor IP for login throttling
+  app.use(cors({ exposedHeaders: ['Content-Disposition'] }));
   app.use(express.json({ limit: '15mb' }));
 
+
+  // Login is public; EVERYTHING else under /api needs a valid login token.
+  app.use('/api/auth', authRoutes);
+  app.use('/api', requireAuth);
+  app.use('/api/users', userRoutes);
 
   // app.use('/api/order-details', orderDetailRoutes);
   // app.use('/api/export', exportOrderDetailRoutes);

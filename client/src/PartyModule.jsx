@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, Fragment } from 'react';
-import { api, API_BASE } from './api';
+import { api, downloadFile } from './api';
 
 // Each row = one Party spanning a 3-year cycle.
 // S.N. is auto-computed from row position (not a stored/editable field — see render below).
@@ -300,7 +300,7 @@ export default function PartyModule({ setStatus }) {
     if (trimmed && trimmed !== selectedAgent?.name) {
       params.set('agent_display_name', trimmed);
     }
-    window.location.href = `${API_BASE}/api/export/parties?${params.toString()}`;
+    downloadFile(`/export/parties?${params.toString()}`).catch(err => setStatus(err.message, true));
   }
 
   // Live totals across all currently-loaded rows (including unsaved edits), one set per year.
