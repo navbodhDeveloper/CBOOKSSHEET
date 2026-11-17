@@ -11,7 +11,7 @@
   padding: 4px 10px; font-size: 12px; border-radius: 3px;
 }
 
-.login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; background: #f3f3f3; }
+.login-wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding: 16px; background: #f3f3f3; }
 .login-card {
   background: white; border: 1px solid #b7c6d9; border-radius: 6px;
   padding: 24px 28px; width: 100%; max-width: 360px;
@@ -32,3 +32,12 @@
 .user-actions button { padding: 2px 7px; font-size: 11px; }
 .user-add { border-top: 1px solid #ccd5e0; padding-top: 4px; }
 .user-add h3 { font-size: 13px; margin: 8px 0; }
+
+/* Page layout: footer always sits at the bottom */
+.app-shell { min-height: 100vh; display: flex; flex-direction: column; }
+.app-footer {
+  margin-top: auto; padding: 8px 16px; text-align: center;
+  background: #1f4e78; color: rgba(255,255,255,0.85); font-size: 12px;
+}
+.app-footer a { color: white; font-weight: bold; text-decoration: underline; }
+.footer-sep { margin: 0 8px; opacity: 0.6; }

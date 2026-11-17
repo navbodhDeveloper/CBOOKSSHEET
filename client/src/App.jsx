@@ -6,6 +6,7 @@ import PartyModule from './PartyModule';
 import Login from './Login';
 import ChangePassword from './ChangePassword';
 import UserManager from './UserManager';
+import Footer from './Footer';
 import { api, getToken, clearToken } from './api';
 import './auth.css';
 
@@ -64,10 +65,17 @@ export default function App() {
   }
 
   if (checking) return <div style={{ padding: 24 }}>Loading…</div>;
-  if (!user) return <Login onLoggedIn={(u) => { setLoginNotice(''); setUser(u); }} notice={loginNotice} />;
+  if (!user) {
+    return (
+      <div className="app-shell">
+        <Login onLoggedIn={(u) => { setLoginNotice(''); setUser(u); }} notice={loginNotice} />
+        <Footer />
+      </div>
+    );
+  }
 
   return (
-    <>
+    <div className="app-shell">
       <header className="topbar">
         <h1>चिल्ड्रन बुक स्पेसिमेन प्रबंधन प्रणाली</h1>
         <div className="user-box">
@@ -103,6 +111,8 @@ export default function App() {
         onChanged={(u) => { setUser(u); setShowPassword(false); setStatus('Password changed'); }}
       />
       {user.role === 'admin' && <UserManager open={showUsers} onClose={() => setShowUsers(false)} setStatus={setStatus} />}
-    </>
+
+      <Footer />
+    </div>
   );
 }
